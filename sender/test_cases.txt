@@ -22,6 +22,4 @@ To do:
 	What must the pi do if one of it files fails to send?
 	Keep some sort of registy of unsent in pi
 	Maybe add an option to send multiple files to rand url 
-		Rather than deleting dic
-
-	Create github for project
+		Rather than deleting dict entry

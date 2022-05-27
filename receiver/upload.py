@@ -135,7 +135,7 @@ def get_file(url):
         return '415 Unsupported Media Type'
     
     # create local names for files
-    data_f_name = os.path.join(app.config['STORAGE_FOLDER'], secure_filename(datafile.filename))
+    data_f_name = os.path.join(app.config['STORAGE_FOLDER'], secure_filename(auth + '_' + datafile.filename))
     name = datafile.filename.split('.')[0]
     checksum_f_name = os.path.join(app.config['STORAGE_FOLDER'], 
             secure_filename(auth + '_' + name + '.sha256'))
