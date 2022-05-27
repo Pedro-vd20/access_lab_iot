@@ -1,0 +1,27 @@
+1. Everything ok case
+2. No Pi id sent
+3. Wrong Pi id sent
+4. Go to existing rand url but without Pi id
+5. Go to existing rand url but with wrong Pi id
+6. Go to existing rand url but with Pi id of different Pi
+7. Go to non-existant rand url
+8. Go to same url from previous exchange
+9. Send request with no file
+10 Send request with no checksum
+11. Send empty file/None (trash non value)
+12. Send empty string as checksum
+13. Sending wrong file extension (correct to only allow text, json or csv)
+14. Sending same file again (already exisiting in local directory)
+15. Sending wrong checksum
+	
+
+
+
+To do:
+	define protocol for unsent files
+	What must the pi do if one of it files fails to send?
+	Keep some sort of registy of unsent in pi
+	Maybe add an option to send multiple files to rand url 
+		Rather than deleting dic
+
+	Create github for project
