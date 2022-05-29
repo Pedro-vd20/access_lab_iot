@@ -22,11 +22,11 @@ from random import choice
 from string import ascii_letters
 
 # only accept txt and sha256 files
-ALLOWED_EXTENSIONS = {'txt', 'sha256'}
+ALLOWED_EXTENSIONS = {'txt', 'json', 'csv'}
 # place to permanently store files
 STORAGE_FOLDER = '/home/pi/received_files/'
 # place where all pi ids are stored
-PI_ID_F = 'ids.txt'
+PI_ID_F = '/home/pi/receiver/ids.txt'
 # how long urls will be
 URL_LEN = 20
 
@@ -74,25 +74,33 @@ def gen_rand_string():
 def authenticate():
     # collect headers from request
     auth = request.headers.get('pi_id', None)
+    num_files = request.headers.get('num_files', None)
 
     print('New request in, auth =', auth)
 
     # if request has no authentication or wrong id
     if ((auth == None) or (not is_auth(auth))):
         print('unathorized access, rejected')
-        return '401 Unauthorized'
+        return ''
+        # check internal flask functionality for returning standard errors
+
+    # check num_files
+    if (num_files == None or type(num_files) != type(1)):
+        num_files = 1
 
     # generate random url for data transfer
     url = gen_rand_string()
+    # MAKE SURE THIS RAND URL ISNT OCCUPIED
 
     print('New random url:', url)
 
     # store mapping of id to random url
-    urls[url] = auth
+    urls[url] = [auth, num_files] # MAKE THIS A TUPLE (AUTH, NUM_FILES_TO_SEND)
+    # TESTING THIS PART IS IMPORTANT
 
     print('Success')
     
-    return '302 Found\n' + url
+    return url
 
 
 # data transfer route
@@ -106,19 +114,23 @@ def get_file(url):
     print('New request in, auth =', auth)
 
     # verify if authorized 
-    if ((auth == None) or (urls.get(url, None) != auth)):
+    if ((auth == None) or (urls.get(url, None)[0] != auth)):
         print('unauthorized request')
-        return '401 Unauthorized'
+        return ''
 
-    # remove url - pi pair from existing urls
-    urls.pop(url)
+    # check how many remaining files
+    if(urls[url][1] == 1):
+        # remove url - pi pair from existing urls
+        urls.pop(url)
+    else:
+        urls[url][1] -= 1 # remove 1 from file count
 
     # receive files
     # check if post request has the files
     if (('sensor_data_file' not in request.files) or 
             ('checksum' not in request.headers)):
         print('Required files not included')
-        return '400 Bad Request'
+        return ''
 
     # collect files
     datafile = request.files['sensor_data_file']
@@ -127,12 +139,12 @@ def get_file(url):
     # check for empty fields / None
     if ((datafile.filename == '') or (checksum == '')):
         print('Empty file or checksum fields')
-        return '400 Bad Request'
+        return ''
 
     # check for allowed file extensions
     if (not allowed_file(datafile.filename)):
         print('wrong file type')
-        return '415 Unsupported Media Type'
+        return ''
     
     # create local names for files
     data_f_name = os.path.join(app.config['STORAGE_FOLDER'], secure_filename(auth + '_' + datafile.filename))
@@ -154,11 +166,11 @@ def get_file(url):
         except:
             f = open(checksum_f_name, 'a')  # creates file if doesn't exist
         f.write(checksum)
-        f.write(' ' + datafile.filename + '\n')
+        f.write(' ' + auth + '_' + datafile.filename + '\n')
         f.close()
 
         # return success code
-        return '200 Success\n' + checksum
+        return checksum
 
     else:
         print('Wrong checksum')
@@ -166,4 +178,4 @@ def get_file(url):
         os.remove(data_f_name)
 
         # return error
-        return '400 Bad Request'
+        return ''

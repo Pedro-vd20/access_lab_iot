@@ -23,3 +23,8 @@ To do:
 	Keep some sort of registy of unsent in pi
 	Maybe add an option to send multiple files to rand url 
 		Rather than deleting dict entry
+
+	PI Should have a last_sent register
+	Pi could put unsent in temp queue folder and sent in more permanent storage folder
+
+	Learn about UTF8 vs ASCII in HTTP
