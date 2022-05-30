@@ -30,7 +30,7 @@ from secret import secret
     # SENDER WILL NOT HAVE CHECKSUM FILES BUT RECEIVER SHOULD STILL STORE THEM
 '''
 
-URL = 'http://10.225.5.51:5000'
+URL = 'http://10.224.83.51:5000'
 FOLDER = '/home/pi/logs/'
 DEST_FOLDER = '/home/pi/sent_files/'
 
