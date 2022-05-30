@@ -24,11 +24,20 @@ from string import ascii_letters
 # only accept txt and sha256 files
 ALLOWED_EXTENSIONS = {'txt', 'json', 'csv'}
 # place to permanently store files
-STORAGE_FOLDER = '/home/pi/received_files/'
+STORAGE_FOLDER = 'received_files/'
 # place where all pi ids are stored
-PI_ID_F = '/home/pi/receiver/ids.txt'
+PI_ID_F = 'ids.txt'
 # how long urls will be
 URL_LEN = 20
+
+# make sure the necessary paths are available
+try:
+    f = open(PI_ID_F, 'r')
+    f.close()
+    os.listdir(STORAGE_FOLDER)
+except:
+    print('Error finding files and folders')
+    exit(-1)
 
 # dictionary to keep mapping of random urls to pi ids
 urls = {}
