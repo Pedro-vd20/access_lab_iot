@@ -1,6 +1,16 @@
 # Access Lab IOT Assistantship
 
-## Related files
+## Related files and directories
+### Receiver
+* `ids.txt`: contains list of all PI ids for server to check.
+* `receiver.py`, `upload_temp.py`: older versions of the receiver, non-functioning.
+* `upload.py`: flask server to manage receiving files.
+*`received_files/`: directory where flask server will save both sha256 checksums and data collected.
+
+### Sender
+* `sender.py`: script to send files to server from pi
+* `secret.py`: contains simply 1 line, meant to store individual Pi's id.
+* `sent_files/`: directory where all files sent successfully will be moved to.
 
 ## Dependencies
 
