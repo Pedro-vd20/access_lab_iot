@@ -127,8 +127,8 @@ def get_file(url):
         return ''
 
     # check how many remaining files
-    num_files = request.headers.get('num_files', 1)
-    if(num_files == 1):
+    num_files = request.headers.get('num_files', '1')
+    if(num_files == '1'):
         # remove url - pi pair from existing urls
         urls.pop(url)
 
