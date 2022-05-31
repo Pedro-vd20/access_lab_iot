@@ -59,7 +59,7 @@ def main(args):
     num_files = len(dir_list)
 
     # send authentication request to server
-    headers = {'pi_id': secret, 'num_files': num_files}
+    headers = {'pi_id': secret}
     try:    
         response = rqs.get(URL, headers=headers).text.strip()
     except:
@@ -85,17 +85,17 @@ def main(args):
     # loop through all files
     for file in dir_list:
         # get hash
-        with open(file, 'rb') as f:
+        with open(FOLDER + file, 'rb') as f:
             hash_256 = hashlib.sha256(f.read()).hexdigest()
             headers['checksum'] = hash_256
 
-        headers['num_files'] = num_files # send server num of files left to send
+        headers['num_files'] = str(num_files) # send server num of files left to send
 
         # collect file
-        files = {'sensor_data_file': open(file, 'rb')}
+        files = {'sensor_data_file': open(FOLDER + file, 'rb')}
 
         # send request
-        response = rqs.post(URL + '/upload/' + response[1], 
+        checksum = rqs.post(URL + '/upload/' + response, 
                     files=files, headers=headers).text.strip()
 
         print(response)
@@ -103,13 +103,14 @@ def main(args):
         files['sensor_data_file'].close()
 
         # check if success
-        if (response == hash_256):
+        if (checksum == hash_256):
             # move file to sent folder
             os.system('mv ' + FOLDER + file + ' ' + DEST_FOLDER)
         else:
             print(file, 'could not be sent')
 
         num_files -= 1
+        
 
 
 
