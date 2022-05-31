@@ -104,7 +104,8 @@ def authenticate():
     print('New random url:', url)
 
     # store mapping of id to random url
-    urls[url] = [auth, num_files] # MAKE THIS A TUPLE (AUTH, NUM_FILES_TO_SEND)
+    global urls
+    urls[url] = auth  # MAKE THIS A TUPLE (AUTH, NUM_FILES_TO_SEND)
     # TESTING THIS PART IS IMPORTANT
 
     print('Success')
@@ -120,19 +121,16 @@ def get_file(url):
     # collect headers for authentication
     auth = request.headers.get('pi_id', None)
 
-    print('New request in, auth =', auth)
-
     # verify if authorized 
-    if ((auth == None) or (urls.get(url, None)[0] != auth)):
+    if ((auth == None) or (urls.get(url, None) == None) or (urls[url] != auth)):
         print('unauthorized request')
         return ''
 
     # check how many remaining files
-    if(urls[url][1] == 1):
+    num_files = request.headers.get('num_files', 1)
+    if(num_files == 1):
         # remove url - pi pair from existing urls
         urls.pop(url)
-    else:
-        urls[url][1] -= 1 # remove 1 from file count
 
     # receive files
     # check if post request has the files
