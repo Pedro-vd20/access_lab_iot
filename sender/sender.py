@@ -95,8 +95,12 @@ def main(args):
         files = {'sensor_data_file': open(FOLDER + file, 'rb')}
 
         # send request
-        checksum = rqs.post(URL + '/upload/' + response, 
+        try:
+            checksum = rqs.post(URL + '/upload/' + response, 
                     files=files, headers=headers).text.strip()
+        except:
+            print(URL + '/upload/' + response, 'can\'t be reached')
+            return -1
 
         print(response)
 
