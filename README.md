@@ -17,6 +17,9 @@
 Python dependencies:
 * os
 * hashlib
+
+### Receiver Only
+* pyopenssl
 * Flask
 * werkzeug
 * random
@@ -26,6 +29,19 @@ Python dependencies:
 ## Server (receiver)
 ### Installing Flask
 For a quick guide on installing Flask, you may refer to the following [guide](https://phoenixnap.com/kb/install-flask).
+
+### Setting up certificates
+Run `$ pip3 install pyopenssl` 
+
+To create a new certificate:
+
+`$ openssl req -x509 -newkey rsa:4096 -nodes -out cert.pem -keyout key.pem -days 3652`
+
+cert.pem is the certificate and key.pem the private key.
+
+The pis store their certificates in `/etc/ssl/certs`, and a copy of cert.pem must be sent there.
+
+To copy from machines: `scp user@server:/absolute_location_of_cert pi@pi_ip:/absolute_dest`
 
 ### Setting up
 To set up flask, navigate to the receiver folder and move the `upload.py` file to your desired directory. Then, run `export FLASK_APP=/current_path/upload.py`.
