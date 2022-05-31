@@ -15,6 +15,10 @@
 15. Sending wrong checksum
 	
 
+Try/except for second rqs.post, in case server shuts down so program doesn't
+Will the server remove an authorized url if unauthorized user gets in?
+
+
 
 
 To do:
