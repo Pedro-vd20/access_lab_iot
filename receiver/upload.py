@@ -123,7 +123,7 @@ def get_file(url):
 
     # verify if authorized 
     if ((auth == None) or (urls.get(url, None) == None) or (urls[url] != auth)):
-        print('unauthorized request')
+        print('unauthorized request, rejected')
         return ''
 
     # check how many remaining files
