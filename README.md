@@ -1,12 +1,80 @@
 # Access Lab IOT Assistantship
 
-## Related files and directories
-### Receiver
+This guide assumes the operating system is Linux, the sender is running off a Raspberry Pi 4.
+
+## INCLUDE OS VERSIONS FOR DEVICES
+
+## Receiver
+
+### Related Files
 * `ids.txt`: contains list of all PI ids for server to check.
 * `receiver.py`, `upload_temp.py`: older versions of the receiver, non-functioning.
 * `upload.py`: flask server to manage receiving files.
 *`received_files/`: directory where flask server will save both sha256 checksums and data collected.
 
+
+### Installing dependencies
+
+The server must have python3 and pip3 installed and updated. To install the remaining dependencies, simply run the following.
+
+```console
+$ pip3 install Flask
+$ pip3 install pyopenssl 
+```
+
+### Setting up the workspace
+
+Before running the server, please make sure the following three files/directories must be in the same path:
+
+1. `upload.py`
+2. `received_files/`
+3. `ids.txt`
+
+The code uses relative paths so it's essential these 3 are in the same directory.
+
+For Flask to run, you must set up the `FLASK_APP` environment variable.
+
+```console
+$ export FLASK_APP=upload.py
+```
+
+It is also possible to use `upload.py`'s absolute path, though this is not necessary as the Flask app is expected to be run from the same directory.
+
+Next step is to generate a self-signed certificate for the server to use. Using pyopenssl, we can create both a certificate and private key using the following:
+
+```console
+$ openssl req -x509 -newkey rsa:4096 -nodes -out cert.pem -keyout key.pem -days 3652 
+```
+
+Running the line above will lead to the following prompts to fill in:
+
+```console
+Generating a RSA private key
+....++++
+.........................................................................................................................................++++
+writing new private key to 'key.pem'
+-----
+You are about to be asked to enter information that will be incorporated
+into your certificate request.
+What you are about to enter is what is called a Distinguished Name or a DN.
+There are quite a few fields but you can leave some blank
+For some fields there will be a default value,
+If you enter '.', the field will be left blank.
+-----
+Country Name (2 letter code) [AU]:AE
+State or Province Name (full name) [Some-State]:Abu Dhabi
+Locality Name (eg, city) []:Abu Dhabi
+Organization Name (eg, company) [Internet Widgits Pty Ltd]:Access
+Organizational Unit Name (eg, section) []:
+Common Name (e.g. server FQDN or YOUR name) []:
+Email Address []:
+
+```
+
+___
+
+
+## Related files and directories
 ### Sender
 * `sender.py`: script to send files to server from pi
 * `secret.py`: contains simply 1 line, meant to store individual Pi's id.
