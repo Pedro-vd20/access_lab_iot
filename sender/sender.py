@@ -47,7 +47,7 @@ def main(args):
         print('Missing arguments')
         return -1 
     
-    URL = 'http://' + args[1] + ':3500'
+    URL = 'https://' + args[1] + ':3500'
     FOLDER = args[2]
 
     # check how many files need to be sent

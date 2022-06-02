@@ -67,12 +67,14 @@ Country Name (2 letter code) [AU]:AE
 State or Province Name (full name) [Some-State]:Abu Dhabi
 Locality Name (eg, city) []:Abu Dhabi
 Organization Name (eg, company) [Internet Widgits Pty Ltd]:Access
-Organizational Unit Name (eg, section) []:
-Common Name (e.g. server FQDN or YOUR name) []:
+Organizational Unit Name (eg, section) []:Access
+Common Name (e.g. server FQDN or YOUR name) []:ip_addr
 Email Address []:
 ```
 
-`cert.pem` and `key.pem` should be created following this. Whatever happens, never share `key.pem` or send it anywhere. In the [Sender](#setting-up-1) section, we will cover how to send the certificate to the PIs.
+`up_addr` must be the server's ip address.
+
+`cert.pem` and `key.pem` should be created following this. Whatever happens, never share `key.pem` or send it anywhere. In the [Sender](#setting-up-1) section, we will cover how to send the certificate to the PIs. This new certificate-key pair should last for about 10 years (3652 days). Typically a shorter expiry is recommended, but for testing and for this lab, 10 years will be chosen. The current certificates will expire on May 2032 and must be replaced in all PIs.
 
 ### Running the receiver
 
@@ -123,10 +125,11 @@ Before running the sender, please make sure the following three files/directorie
 
 When running the code, if the sender cannot find `sent_files/`, it will create it in the same directory as the directory of unsent files. The [next section](#running-the-sender) will further discuss this file structure.
 
-The final step is installing the self-signed certificate created by the receiver. This will allow the sender to trust the identity of the server. Certificates in Raspberry Pis are stored in `/etc/ssl/certs`, and thus, the following command will send the certificate:
+The final step is installing the self-signed certificate created by the receiver. This will allow the sender to trust the identity of the server. The certificate can be installed anywhere, but for ease, should be placed in the same directory as `sender.py`.
 
 ```console
-$ scp user@server_ip:path_to_cert/cert.pem /etc/ssl/certs/
+$ scp user@server_ip:path_to_cert/cert.pem path_to_store_certificate/
+$ export REQUESTS_CA_BUNDLE=/absolute_path_to_certificate/cert.pem
 ```
 
 ### Running the sender
@@ -148,6 +151,6 @@ $ python3 path_to_sender/sender.py arg1 arg2
 * `PI id not found`: the sender failed to import its own id. The script will stop running. Make sure the file `secret.py` is in the same directory as `sender.py` and has the following: `secret='pi_id'` where pi_id is a 16-digit hexadecimal string.
 * `Missing arguments`: the sender did not get the required arguments. The script will stop running.
 * `arg2 not a valid directory`: sender could not access the folder with the logs to send. The script will stop running.
-* `http://arg1:3500 could not be reached`: sender could not reach flask receiver, the script stops running 
+* `https://arg1:3500 could not be reached`: sender could not reach flask receiver, the script stops running 
 * `Authentication failed`: server was unable to verify Pi's identity, sender stops running
 * `file_name could not be sent`: error verifying checksum of sent file. Sender will simply keep that file in the logs folder rather than moving it to the directory of sent files. The script will continue to run, sending other files. This unsent file will be sent the next time the script runs.
