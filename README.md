@@ -129,7 +129,6 @@ The final step is installing the self-signed certificate created by the receiver
 $ scp user@server_ip:path_to_cert/cert.pem /etc/ssl/certs/
 ```
 
-
 ### Running the sender
 
 Unlike receiver, the sender can be run from any path.
