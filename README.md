@@ -138,9 +138,10 @@ $ python3 path_to_sender/sender.py arg1 arg2
 ```
 
 `arg1` is the ip address of the server.
+
 `arg2` is the path where data is stored.
 
-`arg2` can be absolute or relative from wherever `sender.py` will be called. If `arg2 = /home/pi/logs/` then `sent_files` will be found at `/home/pi/sent_files`. If this directory does not exist, `sender.py` will create it.
+`arg2` can be absolute or relative from wherever `sender.py` will be called. If `arg2 = /home/pi/logs/` then `sent_files/` must be located at `/home/pi/sent_files`. If this directory does not exist, `sender.py` will create it.
 
 ### Possible errors
 
