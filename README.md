@@ -10,7 +10,7 @@ The receiver is a Flask server waiting for the various senders to authenticate t
 
 ### Related Files
 * `ids.txt`: contains list of all PI ids for server to check.
-* `receiver.py`, `upload_temp.py`: older versions of the receiver, non-functioning.
+* `receiver.py`, `temp_upload.py`: older versions of the receiver, non-functioning.
 * `upload.py`: flask server to manage receiving files.
 *`received_files/`: directory where flask server will save both sha256 checksums and data collected.
 
@@ -81,7 +81,7 @@ Email Address []:
 Make sure to change your current directory to the same as `upload.py`. Then simple run
 
 ```console
-$ flask run --host=my_ip --port=3500
+$ flask run --host=my_ip --port=3500 --cert=cert.pem --key=key.pem
 ```
 
 For this project, the port to be used has been defined as 3500. This will always be the case. `my_ip` should be the public IP address of the server. This will run the project in development mode and is fine for now while testing occurs. Later, the project must be deployed as production version, as this one is more stable and secure.
