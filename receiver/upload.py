@@ -99,14 +99,15 @@ def authenticate():
 
     # generate random url for data transfer
     url = gen_rand_string()
-    # MAKE SURE THIS RAND URL ISNT OCCUPIED
+    # make sure rand url isn't in use
+    global urls
+    while urls.get(url, None) != None:
+        url = gen_rand_string()
 
     print('New random url:', url)
 
     # store mapping of id to random url
-    global urls
-    urls[url] = auth  # MAKE THIS A TUPLE (AUTH, NUM_FILES_TO_SEND)
-    # TESTING THIS PART IS IMPORTANT
+    urls[url] = auth      
 
     print('Success')
     
@@ -155,15 +156,17 @@ def get_file(url):
     
     # create local names for files
     data_f_name = os.path.join(app.config['STORAGE_FOLDER'], secure_filename(auth + '_' + datafile.filename))
+    data_f_name_temp = os.path.join(app.config['STORAGE_FOLDER'], secure_filename(auth + 'temp' + '_' + datafile.filename))
+
     name = datafile.filename.split('.')[0]
     checksum_f_name = os.path.join(app.config['STORAGE_FOLDER'], 
             secure_filename(auth + '_' + name + '.sha256'))
 
     # save data file
-    datafile.save(data_f_name)
+    datafile.save(data_f_name_temp)
     
     # verify checksum
-    chksm = verify_checksum(data_f_name, checksum)
+    chksm = verify_checksum(data_f_name_temp, checksum)
     if chksm: # successful verification
         print('Checksum verified successfully')
         
@@ -173,8 +176,11 @@ def get_file(url):
         except:
             f = open(checksum_f_name, 'a')  # creates file if doesn't exist
         f.write(checksum)
-        f.write(' ' + auth + '_' + datafile.filename + '\n')
+        f.write(' ' + secure_filename(auth + '_' + datafile.filename) + '\n')
         f.close()
+
+        # remove temp file
+        os.system('mv ' + data_f_name_temp + ' ' + data_f_name)
 
         # return success code
         return checksum
@@ -182,7 +188,7 @@ def get_file(url):
     else:
         print('Wrong checksum')
         # delete store file
-        os.remove(data_f_name)
+        os.remove(data_f_name_temp)
 
         # return error
         return ''
