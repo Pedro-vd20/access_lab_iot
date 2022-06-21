@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Pi Wifi Set Up</title>
+
+	<link rel="stylesheet" type="text/css" href="static/styles.css">
+</head>
+<body>
+
+	<div class="container">
+		<h1>Setting Up your Device</h1>
+
+		{% if error %}
+		<div>
+			<p>There was an error trying to connect.</p>
+			<p>{{ error_info }}</p>
+		</div>
+		{% endif %}
+
+		<p>To set up your Pi, please fill in the following information to connect to the internet.</p>
+
+		<form action="/connect" method="post">
+			<div class="form-group">	
+				<label for="network">WiFi Network:</label>
+				<select required id="network" name="network">
+					
+					{% for wifi in wifi_list %}
+					<option value="{{ wifi }}">{{ wifi }}</option>
+					{% endfor %}
+				</select>
+			</div>
+
+			<p>Is your internet a private network or an organization network?</p>
+
+			<div class="form-group">
+				<input required class="private" id="private" type="radio" name="type" value="private">
+				<label for="private">Private</label>
+			</div>
+
+			<div class="form-group">
+				<input required id="organization" type="radio" name="type" value="organization">
+				<label for="organization">Organization</label>
+			</div>
+
+			<div class="form-group">
+				<input required class="private" id="dont-know" type="radio" name="type" value="private">
+				<label for="dont-know">Don't know</label>
+			</div>
+
+			<p>Please input your network <span class="invisible" id="user-text">username and </span>password</p>
+			<div class="form-group">	
+				<label class="invisible" id="user-label" for="username">Username:</label>
+				<input class="invisible" id="username" type="text" name="user">
+			</div>
+
+			<div class="form-group">
+				<label for="password">Password:</label>
+				<input required id="password" type="password" name="pass">
+			</div>
+			<div class="form-group">
+				<label for="retype-password">Retype password:</label>
+				<input required id="retype-password" type="password" name="pass2">
+			</div>
+
+			<input type="submit">
+
+		</form>
+	</div>
+
+	<script type="text/javascript" src="static/app.js"></script>
+
+</body>
+</html>

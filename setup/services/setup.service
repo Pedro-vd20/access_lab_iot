@@ -1,0 +1,12 @@
+[Unit]
+Description=Pi setup
+After=network.target
+
+[Service]
+WorkingDirectory=/home/pi/
+ExecStart=/usr/bin/python3 /home/pi/setup.py
+User=pi
+
+[Install]
+WantedBy=multi-user.target
+
