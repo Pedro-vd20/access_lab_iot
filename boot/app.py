@@ -1,6 +1,6 @@
 from flask import Flask, request, render_template, redirect
 import os
-import modules
+from modules import *
 
 ##########
 
@@ -73,7 +73,7 @@ def home():
     if len(options) == 0:
         # HANDLE ERROR
         log('ERROR no networks found, informing user')
-        return 'No networks detected, be sure Pi can connect to wifi'
+        return render_template('no_networks.html')
 
     # print(type(txt))
 
@@ -101,6 +101,7 @@ def home():
 @app.route('/connect/', methods=['POST'])
 def handle_form():
     # collect form data
+    email = request.form['email']
     network = request.form['network']
     n_type = (request.form['type'] == 'organization') # network type is organization
     password = request.form['pass']
@@ -112,9 +113,9 @@ def handle_form():
         # write error into file
         log('Passwords did not match, returning to form')
         try:
-            f = open('/home/pi/network_diag.txt', 'w')
+            f = open(PATH + 'network_diag.txt', 'w')
         except:
-            f = open('home/pi/network_diag.txt', 'a')
+            f = open(PATH + 'network_diag.txt', 'a')
         f.write('Passwords do not match')
         f.close()
 
@@ -122,6 +123,13 @@ def handle_form():
         return redirect('/') 
 
     log('Form received, attempting to connect to ' + network)
+
+    # store email for later
+    try:
+        f = open(HOME + 'email.txt', 'w')
+    except:
+        f = open(HOME + 'email.txt', 'a')
+    f.write(email)
 
     # create network config file
     create_network_config(network, password, n_type, user)
@@ -131,9 +139,8 @@ def handle_form():
     # revert py into non-access point mode
     run('python3 ' + PATH + 'setup.py')
 
-    return 'The Pi is trying to connect, if in a few minutes you can still connect to the \'access\' wifi, there was an error.'
-
-
+    return render_template('testing_wifi.html')
 
 app.run(host='192.168.4.1', port=3500)
+#app.run()
 

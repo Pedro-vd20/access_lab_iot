@@ -1,7 +1,8 @@
 import os
 import requests as rqs
 import time
-import modules
+#import modules
+from modules import *
 import signal
 
 # install necessary packages to run program
@@ -9,10 +10,16 @@ import signal
 #           Pi must be connected to a display
 def wifi_setup():
     # install hostapd, dnsmasq, pip3, flask
+    # pyserial pigpio yagmail
+    # sudo apt-get pigpio
+    # sudo systemctl start pigpio
+    # enable / install smbus2, RPi, signal
+    # Find out if BME280 and adafruit_ms8607 are installed by pip, manually??
     run('sudo apt -y update')
     run('sudo apt -y upgrade')
     run('sudo apt-get -y install python3-pip')
     run('pip3 install Flask')
+    # run('pip3 install yagmail')
     run('sudo apt-get -y install hostapd')
     run('sudo apt-get -y install dnsmasq')
     run('sudo DEBIAN_FRONTEND=noninteractive apt install -y netfilter-persistent iptables-persistent')
@@ -206,7 +213,7 @@ def main():
     elif state == 4:
         debug('Testing wifi connection')
         test_connection()
-        run('python3 /home/pi/network_diag.py')
+        run('python3 ' + PATH + 'network_diag.py')
     # state 3 will keep Pi as wireless access point but test wifi
     # state 4 will revert pi as router
     # state 5 will start the detection and measurement

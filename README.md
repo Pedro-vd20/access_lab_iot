@@ -1,8 +1,24 @@
-# Access Lab IOT Assistantship
+# Access Lab Measurement Stations
 
 This guide assumes the operating system is Linux, the sender is running off a Raspberry Pi 4.
 
-## INCLUDE OS VERSIONS FOR DEVICES
+## CHECKLIST
+
+1. Error codes for sender/receiver
+2. Add email functionality
+3. Add section with all dependencies for pi and local server
+4. Better user-friendly messages while pi reboots / checks for errors
+5. Change test-network in boot to contact receiver rather than google.com
+6. Logging info with error codes?
+7. Add hardware wiring section
+8. Fix state 0 to install all other dependencies
+9. Include images for hardware section
+10. Fix related files to include Access files
+11. Describe logging info (how to access them and all)
+12. Diagnostic file (have Pi send out diagnostics like memory, temp etc once a day)
+13. Complete wrapper class bme280 beseecher and ms8607 beseecher
+14. Change print to log in sender / receiver
+
 
 ## Receiver
 
@@ -17,7 +33,14 @@ The receiver is a Flask server waiting for the various senders to authenticate t
 
 ### Installing dependencies
 
-The server must have python3 and pip3 installed and updated. To install the remaining dependencies, simply run the following.
+The server must have python3 and pip3 installed and updated.
+
+#### Dependencies
+
+* Flask
+* pyopenssl
+
+#### Installation
 
 ```console
 $ pip3 install Flask
@@ -28,9 +51,14 @@ $ pip3 install pyopenssl
 
 Before running the server, please make sure the following three files/directories must be in the same path:
 
-1. `upload.py`
-2. `received_files/`
-3. `ids.txt`
+```bash
+./
+ |-- upload.py
+ |-- ids.txt
+ |-- received_files/
+ |   |--
+ |
+```
 
 The code uses relative paths so it's essential these 3 are in the same directory.
 
@@ -72,13 +100,13 @@ Common Name (e.g. server FQDN or YOUR name) []:ip_addr
 Email Address []:
 ```
 
-`up_addr` must be the server's ip address.
+`ip_addr` must be the server's ip address.
 
 `cert.pem` and `key.pem` should be created following this. Whatever happens, never share `key.pem` or send it anywhere. In the [Sender](#setting-up-1) section, we will cover how to send the certificate to the PIs. This new certificate-key pair should last for about 10 years (3652 days). Typically a shorter expiry is recommended, but for testing and for this lab, 10 years will be chosen. The current certificates will expire on May 2032 and must be replaced in all PIs.
 
 ### Running the receiver
 
-Make sure to change your current directory to the same as `upload.py`. Then simple run
+Make sure to change your current directory to the same as `upload.py`. Then run
 
 ```console
 $ flask run --host=my_ip --port=3500 --cert=cert.pem --key=key.pem
@@ -87,6 +115,9 @@ $ flask run --host=my_ip --port=3500 --cert=cert.pem --key=key.pem
 For this project, the port to be used has been defined as 3500. This will always be the case. `my_ip` should be the public IP address of the server. This will run the project in development mode and is fine for now while testing occurs. Later, the project must be deployed as production version, as this one is more stable and secure.
 
 ### Possible errors
+
+The following errors will be logged into the receiver's log files.
+
 * `Error finding files and folders`: receiver could not find `ids.txt` or the folder `received_files/`. The server will not run. Please make sure `uplodad.py`, `received_files/`, and `ids.txt` are all in the same directory and that the server 
 * `Unauthorized access, rejected`: receiver failed to find a valid pi_id in the request. The request is ignored.
 
@@ -96,6 +127,17 @@ The rest of the errors assume successful validation
 * `Empty file or checksum fields`: the file and checksum are not missing but are left empty by the sender. Request gets ignored.
 * `Wrong file type`: the sent file is of the wrong type. Request is ignored.
 * `Wrong checksum`: the checksum sent does not match the sent file. The file is not downloaded and the request is ignored.
+
+### Response Codes
+
+The receiver will respond with any of the following response codes:
+
+* `200`: request successful, files received and verified.
+* `301 new_url`: the request was received successfully and the file should be sent to the url attached.
+* `401`: unathorized request. The server.
+* `412`: precondition failed, files to receive not sent.
+* `415`: unsopported file type received, request rejected.
+* `500`: error receiving file, checksum could not be verified.
 
 ___
 
@@ -110,7 +152,19 @@ The sender uses the Python requests module to securely send the data collected b
 
 ### Installing dependencies
 
-The sender must have python3 and pip3 installed and updated. To install the remaining dependencies, simply run the following.
+The sender must have python3 and pip3 installed and updated.
+
+#### Dependencies
+* requests
+* Flask
+* hostapd
+* dnsmasq
+* pigpiod
+* serial
+* pigpio
+* pynmea2
+* adafruit_bme280
+* adafruit_ms8607
 
 ```console
 $ pip3 install requests

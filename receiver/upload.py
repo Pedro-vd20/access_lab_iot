@@ -90,7 +90,7 @@ def authenticate():
     # if request has no authentication or wrong id
     if ((auth == None) or (not is_auth(auth))):
         print('unathorized access, rejected')
-        return ''
+        return '401'
         # check internal flask functionality for returning standard errors
 
     # check num_files
@@ -111,7 +111,7 @@ def authenticate():
 
     print('Success')
     
-    return url
+    return '301' + url
 
 
 # data transfer route
@@ -125,7 +125,7 @@ def get_file(url):
     # verify if authorized 
     if ((auth == None) or (urls.get(url, None) == None) or (urls[url] != auth)):
         print('unauthorized request, rejected')
-        return ''
+        return '401'
 
     # check how many remaining files
     num_files = request.headers.get('num_files', '1')
@@ -138,7 +138,7 @@ def get_file(url):
     if (('sensor_data_file' not in request.files) or 
             ('checksum' not in request.headers)):
         print('Required files not included')
-        return ''
+        return '412'
 
     # collect files
     datafile = request.files['sensor_data_file']
@@ -147,12 +147,12 @@ def get_file(url):
     # check for empty fields / None
     if ((datafile.filename == '') or (checksum == '')):
         print('Empty file or checksum fields')
-        return ''
+        return '412'
 
     # check for allowed file extensions
     if (not allowed_file(datafile.filename)):
         print('wrong file type')
-        return ''
+        return '415'
     
     # create local names for files
     data_f_name = os.path.join(app.config['STORAGE_FOLDER'], secure_filename(auth + '_' + datafile.filename))
@@ -183,7 +183,7 @@ def get_file(url):
         os.system('mv ' + data_f_name_temp + ' ' + data_f_name)
 
         # return success code
-        return checksum
+        return '200'
 
     else:
         print('Wrong checksum')
@@ -191,4 +191,4 @@ def get_file(url):
         os.remove(data_f_name_temp)
 
         # return error
-        return ''
+        return '500'

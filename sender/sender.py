@@ -69,10 +69,13 @@ def main(args):
     print(response)
 
     # check if response is a success
-    if(response == ''): # empty response means error
+    if(response == '401'): # empty response means error
         print("Authentication failed")
         return -1    # FIGURE OUT WHAT TO DO HERE
         # here we must set some flag to indicate the sending failed for this file
+    
+    # collect url from the response 301 new_url
+    response = response.strip().split(' ')[1]
 
     # check if dest folder exists
     DEST_FOLDER = FOLDER + '../sent_files/'
@@ -96,7 +99,7 @@ def main(args):
 
         # send request
         try:
-            checksum = rqs.post(URL + '/upload/' + response, 
+            rsp = rqs.post(URL + '/upload/' + response, 
                     files=files, headers=headers).text.strip()
         except:
             print(URL + '/upload/' + response, 'can\'t be reached')
@@ -107,7 +110,7 @@ def main(args):
         files['sensor_data_file'].close()
 
         # check if success
-        if (checksum == hash_256):
+        if (rsp == '200'):
             # move file to sent folder
             os.system('mv ' + FOLDER + file + ' ' + DEST_FOLDER)
         else:

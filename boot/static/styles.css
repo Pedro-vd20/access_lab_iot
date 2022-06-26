@@ -16,3 +16,35 @@ body {
 .invisible {
 	display: none;
 }
+
+.form-info p {
+	font-size: 0.9rem;
+}
+
+#heading {
+	padding-top: 15px;
+}
+
+img {
+	max-height: 100px;
+}
+
+.btn {
+	background: #e39241;
+	color: white;
+}
+
+#body {
+	max-width: 700px;
+}
+
+#error {
+	background: #d8d8d8;
+	border-radius: 1%;
+	width: 80%;
+	margin: auto;
+}
+
+#error p {
+	margin: 0;
+}
