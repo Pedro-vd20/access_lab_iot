@@ -4,8 +4,8 @@ This guide assumes the operating system is Linux, the sender is running off a Ra
 
 ## CHECKLIST
 
-1. Error codes for sender/receiver
-2. Add email functionality
+1. Error codes for sender/receiver DONE
+2. Add email functionality CANCELLED
 3. Add section with all dependencies for pi and local server
 4. Better user-friendly messages while pi reboots / checks for errors
 5. Change test-network in boot to contact receiver rather than google.com
@@ -18,27 +18,50 @@ This guide assumes the operating system is Linux, the sender is running off a Ra
 12. Diagnostic file (have Pi send out diagnostics like memory, temp etc once a day)
 13. Complete wrapper class bme280 beseecher and ms8607 beseecher
 14. Change print to log in sender / receiver
-
+15. Create folder structure for sender once all files are accounted for.
+16. Create access email for this
+17. Change sender section to Access station section
+18. Basically rewrite whole Access Station section
+19. Detal OS specifications and dependency versions
+20. List the different sites the receiver hosts (upload, home page, etc)
+21. Add files that the boot creates for temp purposes
+22. Is it possible for pi not to reboot after all the changes and stuff??? would greatly speed up
+1. Add whole section on setting up ports and stuff
+1. Test script for sensors
+1. Add server website to see station
 
 ## Receiver
 
-The receiver is a Flask server waiting for the various senders to authenticate themselves and send data collected in the form of `.csv`, `.txt`, or `.json` files.
+The receiver is a Flask server waiting for the various Access Stations to authenticate themselves and send data collected in the form of `.csv`, `.txt`, or `.json` files. It also receives diagnostics from the stations. Additionally, it allows users to see the data collected by the station they're hosting.
 
 ### Related Files
-* `ids.txt`: contains list of all PI ids for server to check.
+* `ids.csv`: contains list of all PI ids and their registered email for server to check.
 * `receiver.py`, `temp_upload.py`: older versions of the receiver, non-functioning.
 * `upload.py`: flask server to manage receiving files.
-*`received_files/`: directory where flask server will save both sha256 checksums and data collected.
+* `register.py`: generates new random id for brand new access stations. 
+* `logs.txt`: if non-existant, `upload.py` will create it and write errors or important info on it.
+* `received_files/`: directory where flask server will save both sha256 checksums and data collected.
 
 
 ### Installing dependencies
 
-The server must have python3 and pip3 installed and updated.
+The server must have python3 and pip3 installed.
+
+```console
+$ sudo apt-get update
+$ sudo apt-get upgrade
+$ sudo apt-get install python3
+$ sudo apt-get install python3-pip
+```
 
 #### Dependencies
 
-* Flask
-* pyopenssl
+* Flask 2.1.2
+* werkzeug 2.1.2
+* pyopenssl 
+* os
+* random
+* string
 
 #### Installation
 
@@ -51,16 +74,18 @@ $ pip3 install pyopenssl
 
 Before running the server, please make sure the following three files/directories must be in the same path:
 
-```bash
+```console
 ./
  |-- upload.py
- |-- ids.txt
+ |-- ids.csv
+ |-- register.py
+ |-- logs.txt
  |-- received_files/
  |   |--
  |
 ```
 
-The code uses relative paths so it's essential these 3 are in the same directory.
+The code uses relative paths so it's essential these files are in the same directory.
 
 For Flask to run, you must set up the `FLASK_APP` environment variable.
 
@@ -102,11 +127,26 @@ Email Address []:
 
 `ip_addr` must be the server's ip address.
 
-`cert.pem` and `key.pem` should be created following this. Whatever happens, never share `key.pem` or send it anywhere. In the [Sender](#setting-up-1) section, we will cover how to send the certificate to the PIs. This new certificate-key pair should last for about 10 years (3652 days). Typically a shorter expiry is recommended, but for testing and for this lab, 10 years will be chosen. The current certificates will expire on May 2032 and must be replaced in all PIs.
+`cert.pem` and `key.pem` should be created following this. Never share `key.pem`. In the [Sender](#setting-up-1) section, we will cover how to send the certificate to the Access Stations. This new certificate-key pair should last for about 10 years (3652 days). Typically a shorter expiry is recommended, but for testing and for this lab, 10 years will be chosen. The current certificates will expire on May 2032 and must be replaced in all stations.
 
 ### Running the receiver
 
-Make sure to change your current directory to the same as `upload.py`. Then run
+Make sure to change your current directory to the same as `upload.py`. 
+
+```console
+./
+ |-- upload.py
+ |-- ids.csv
+ |-- register.py
+ |-- cert.pem
+ |-- key.pem
+ |-- logs.txt
+ |-- received_files/
+ |   |--
+ |
+````
+
+Then run:
 
 ```console
 $ flask run --host=my_ip --port=3500 --cert=cert.pem --key=key.pem
@@ -118,7 +158,7 @@ For this project, the port to be used has been defined as 3500. This will always
 
 The following errors will be logged into the receiver's log files.
 
-* `Error finding files and folders`: receiver could not find `ids.txt` or the folder `received_files/`. The server will not run. Please make sure `uplodad.py`, `received_files/`, and `ids.txt` are all in the same directory and that the server 
+* `Error finding files and folders`: receiver could not find `ids.csv` or the folder `received_files/`. The server will not run. Please make sure `uplodad.py`, `received_files/`, and `ids.txt` are all in the same directory and that the server 
 * `Unauthorized access, rejected`: receiver failed to find a valid pi_id in the request. The request is ignored.
 
 The rest of the errors assume successful validation
@@ -133,15 +173,83 @@ The rest of the errors assume successful validation
 The receiver will respond with any of the following response codes:
 
 * `200`: request successful, files received and verified.
-* `301 new_url`: the request was received successfully and the file should be sent to the url attached.
-* `401`: unathorized request. The server.
-* `412`: precondition failed, files to receive not sent.
+* `301 new_url`: the request was received successfully and the file should be sent to `/upload/new_url`.
+* `401`: unathorized request. The server will ignore the request.
+* `412`: precondition failed, files to receive not sent in request.
 * `415`: unsopported file type received, request rejected.
 * `500`: error receiving file, checksum could not be verified.
 
 ___
 
-## Sender
+## Access Stations
+
+The Access Stations have two main modes: boot and data collection.
+
+### Prior Set Up
+
+Before the Access Stations are ready to be deployed, please ensure each of the following.
+
+ERROR FIX LATER
+
+1. Check serial ports and stuff
+2. Set up wifi
+3. Set up the file structure 
+4. Set up the services
+5. Install (make a separate file for state 0?????)
+
+### Folder Structure
+
+```console
+/home/pi/
+ |-- boot/
+ |   |-- app.py
+ |   |-- modules.py
+ |   |-- setup.py
+ |   |-- state.txt
+ |   |-- services/
+ |   |   |-- flask_app.service
+ |   |   |-- setup.service 
+ |   |-- static/
+ |   |   |-- app.js
+ |   |   |-- styles.css
+ |   |   |-- images/
+ |   |   |   |-- ACCESS_LOGO_SQUARE_violet_drop1.png
+ |   |-- templates/
+ |   |   |-- index.html
+ |   |   |-- no_networks.html
+ |   |   |-- testing_wifi.html
+ |-- ACCESS_station_lib.py
+ |-- data_collection.py
+ |-- sender.py
+ |-- station_id.py
+ |
+```
+
+### Boot Mode
+
+The first mode of the Access Station is boot mode. Here the station goes through the installation of required dependencies, settings configuration, and connection to wifi once deployed in a new location.
+
+#### Related Files
+
+All files inside the boot folder will setup the Access Station.
+
+* `app.py`: small flask server whos only purpose is to collect the wifi information from the user in order to connect.
+* `modules.py`: shared code and constants imported by other python files.
+* `setup.py`: main driver for setting up the access stations. Checks the current state of the machine and continues with next steps by running other files / executing commands.
+* `state.txt`: stores the current state of the station. If the file is non-existant, the state is assumed as 0. States can range from 0 to 5.
+* `services/`: system services to automatically run the setup and the flask app each time the station boots.
+* `static/`: resources for the flask app such as images, stylesheets, and javascript code.
+* `templates/`: html pages for the flask app to render.
+
+### 
+
+
+The boot process will use various other files for quick storage of network status and information.
+
+#### States
+
+
+
 
 The sender uses the Python requests module to securely send the data collected by the Pi to the main server.
 
@@ -165,9 +273,22 @@ The sender must have python3 and pip3 installed and updated.
 * pynmea2
 * adafruit_bme280
 * adafruit_ms8607
+* google
+* google-auth
+* google-api-python-client
+
+___
+
+* google-auth-httplib2
+* google-auth-oauthlib
 
 ```console
 $ pip3 install requests
+$ pip3 install google-auth
+$ pip3 install google-api-python-client
+$ pip3 install google-auth-httplib2
+$ pip3 install google-auth-oauthlib
+$ sudo apt-get -y pigpiod
 ```
 
 ### Setting up
