@@ -185,17 +185,93 @@ ___
 
 The Access Stations have two main modes: boot and data collection.
 
-### Prior Set Up
+### Setting Up
 
-Before the Access Stations are ready to be deployed, please ensure each of the following.
+This guide will follow the steps from boot up to operation required to set up the Access Station.
 
-ERROR FIX LATER
+1. Booting the RPi: configure the keyboard and and username. The user for all stations should be `pi`. 
 
-1. Check serial ports and stuff
-2. Set up wifi
-3. Set up the file structure 
-4. Set up the services
-5. Install (make a separate file for state 0?????)
+1. Configure the settings:
+
+    ```console
+    $ sudo raspi-config
+    ```
+    1. Enable `Interface Options`->`SSH`
+    1. Enable `Interface Options`->`I2C`
+    1. In `Interface Options`->`Serial Port` disable login shell but enable serial port hardware.
+    1. Configure `Localisation Options`->`WLAN Country`
+    1. Enable 
+
+1. Connect to the network.
+    ```console
+    $ sudo nano /etc/wpa_supplicant/wpa_supplicant.conf
+    ```
+    and add the following at the end of the file:
+
+    ```console
+    network={
+        ssid="nyu"
+        proto=RSN
+        key_mgmt=WPA-EAP
+        eap=PEAP
+        identity="net_id"
+        password="password"
+        phase2="auth=MSCHAPV2"
+        priority=1
+    }
+    ```
+
+    replacing `net_id` and `password` with your own.    
+
+    Then reboot the RPi to connect and implement the settings from step (2).
+
+1. Download the necessary files and setup the folder structure as described [here](#folder-structure)
+
+1. Make sure Python3 and pip3 are properly installed.
+
+    ```console
+    $ sudo apt update
+    $ sudo apt upgrade -y
+    $ sudo apt-get install python3-pip -y
+    ```
+
+1. Run `dependencies.py` to install all dependencies.
+
+    ```console
+    $ python3 /home/pi/boot/dependencies.py
+    ```
+
+1. Configue serial ports, making sure the `ttyS0` is not set as `serial0`.
+
+    ```console
+    $ sudo nano /boot/config.txt
+    ```
+
+    Add the following at the bottom of the file.
+
+    ```console
+    dtoverlay=miniuart-bt
+    dtoverlay=uart2
+    ```
+
+    Make sure both serial ports are properly set by running
+
+    ```console
+    $ ls -l /dev
+    ```
+    
+    `serial0` should be mapped to `ttyAMA0` and `ttyAMA1` should also appear on the outputs.
+
+1. Connect the RPi to the sensors
+    
+    WHAT DEVICES GO WHERE LIST PINS HERE
+
+1. Run `test.py` to do a quick test of all the hardware. If the RPi reboots, the hardware testing was successful.
+
+1. Wait to see if it becomes a wireless access station. If the `access` network becomes visible, the station has been successfully set up.
+___
+
+The Access Stations have two main modes: boot and data collection.
 
 ### Folder Structure
 
@@ -203,6 +279,7 @@ ERROR FIX LATER
 /home/pi/
  |-- boot/
  |   |-- app.py
+ |   |-- dependencies.py
  |   |-- modules.py
  |   |-- setup.py
  |   |-- state.txt
@@ -222,8 +299,38 @@ ERROR FIX LATER
  |-- data_collection.py
  |-- sender.py
  |-- station_id.py
+ |-- test.py
  |
 ```
+
+### Installing Dependencies
+
+The Access Station must have python3 and pip3 installed.
+
+```console
+$ sudo apt-get update
+$ sudo apt-get upgrade
+$ sudo apt-get install python3
+$ sudo apt-get install python3-pip
+```
+
+#### Dependencies
+
+Python dependencies
+* Flask 2.1.2
+* requests 2.25.1
+* pyserial 3.5
+* pigpio 
+* pynmea
+* adafruit_bme280
+* adafruit_ms8607
+
+Other dependencies
+* hostapd 2:2.9.0-21
+* dnsmasq 2.85-1
+* pigpiod 1.79-1+rpt1
+
+
 
 ### Boot Mode
 
@@ -241,7 +348,6 @@ All files inside the boot folder will setup the Access Station.
 * `static/`: resources for the flask app such as images, stylesheets, and javascript code.
 * `templates/`: html pages for the flask app to render.
 
-### 
 
 
 The boot process will use various other files for quick storage of network status and information.
