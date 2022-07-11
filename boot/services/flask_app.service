@@ -3,8 +3,8 @@ Description=flask app
 After=network.target
 
 [Service]
-WorkingDirectory=/home/pi/
-ExecStart=/usr/bin/python3 /home/pi/app.py
+WorkingDirectory=/home/pi/boot/
+ExecStart=/usr/bin/python3 /home/pi/boot/app.py
 User=pi
 
 [Install]

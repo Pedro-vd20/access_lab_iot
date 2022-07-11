@@ -29,10 +29,8 @@ def write_state(num):
     f.close()
 
 def log(msg):
-    try:
-        f = open(HOME + 'logs.txt', 'w')
-    except:
-        f = open(HOME + 'logs.txt', 'a')
+    
+    f = open(HOME + 'logs.txt', 'a')
 
     # get current time
     now = datetime.datetime.now()

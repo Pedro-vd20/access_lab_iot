@@ -4,26 +4,12 @@ import time
 #import modules
 from modules import *
 import signal
+import socket
 
-# install necessary packages to run program
-# Prereqs:  must manually connect pi to the wifi
-#           Pi must be connected to a display
-def wifi_setup():
-    # install hostapd, dnsmasq, pip3, flask
-    # pyserial pigpio yagmail
-    # sudo apt-get pigpio
-    # sudo systemctl start pigpio
-    # enable / install smbus2, RPi, signal
-    # Find out if BME280 and adafruit_ms8607 are installed by pip, manually??
-    run('sudo apt -y update')
-    run('sudo apt -y upgrade')
-    run('sudo apt-get -y install python3-pip')
-    run('pip3 install Flask')
-    # run('pip3 install yagmail')
-    run('sudo apt-get -y install hostapd')
-    run('sudo apt-get -y install dnsmasq')
-    run('sudo DEBIAN_FRONTEND=noninteractive apt install -y netfilter-persistent iptables-persistent')
+NAME='access'
 
+# set up Pi as a router for user to connect to
+def router_setup():
     # reset wpa file
     file_path = PATH + 'wpa_supplicant.conf'
     try:
@@ -34,16 +20,7 @@ def wifi_setup():
     f.write('ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev\nupdate_config=1\ncountry=AE\n\n')
     f.close()
 
-    run('sudo mv ' + PATH + 'wpa_supplicant.conf /etc/wpa_supplicant/')
 
-    log('Flask, hostapd, and dnsmasq installed')
-
-    # reboot system
-    run('sudo systemctl reboot')
-
-
-# set up Pi as a router for user to connect to
-def router_setup():
     # enable wireless access post
     run('sudo systemctl unmask hostapd')
     run('sudo systemctl enable hostapd')
@@ -158,49 +135,52 @@ def test_connection():
     if 'NO-CARRIER' in text: # no ip detected
         log('Could not connect to wifi, reverting to wireless access network')
         f.write('Failed to connect to the network. Make sure the password is correct')
-        write_state(1)
         f.close()
+        write_state(2) 
         
         # reboot pi and change settings
-        run('python3 ' + PATH + 'setup.py')
-        exit(0)
+        router_setup()
 
     signal.signal(signal.SIGALRM, handler)
     signal.alarm(10) # set timeout timer for request
 
     try:
         rqs.get('https://google.com') # CHANGE LATER to server IP
-        log('Pi is connected to the internet, starting data collection')
         signal.alarm(0) # turn off alarm
+        log('Pi is connected to the internet, starting data collection')
         # if test network does not time out
         write_state(5)
+        f.close()
+        collect_data()
     except:
         # connected to the router but timeout connecting to the internet
         f.write('The Pi could connect to the wifi but has no access to the internet. Be sure your wifi connection is working properly')
-        write_state(1)
+        f.close()
+        write_state(2)
         log('Pi connected to the router but has no access to wifi')
+        router_setup()
 
-    f.close()
-    run('python3 ' + PATH + 'setup.py') # continue to next phase depending on state
+
+def collect_data():
+        log('Starting data collection')
+        time.sleep(20)
+        run('sudo systemctl start diagnostics')
+        run('python3 ' + HOME + 'data_collection.py')
 
 def main():
     # check state of machine
     try:
         # try read file with state
-        f = open(STATE, 'r')
+        f = open(PATH + STATE, 'r')
         state = int(f.readline().strip())
         f.close()
     except:
         # file not found, assume state is 0
-        state = 0
+        state = 1
 
     log('Current state: ' + str(state))
 
-    if state == 0: # no setup, py is at the lab and is connected to the internet
-        # modify state
-        write_state(1)
-        wifi_setup() # download and install packages
-    elif state == 1: # packages downloaded, Pi now needs to set up as a router
+    if state == 1: # packages downloaded, Pi now needs to set up as a router
         write_state(2)
         router_setup()
     elif state == 2: # start up flask app
@@ -211,15 +191,15 @@ def main():
         log('Pi will stop serving as a wireless access point')
         revert_router()
     elif state == 4:
-        debug('Testing wifi connection')
+        log('Testing wifi connection')
         test_connection()
         run('python3 ' + PATH + 'network_diag.py')
     # state 3 will keep Pi as wireless access point but test wifi
     # state 4 will revert pi as router
     # state 5 will start the detection and measurement
     elif state == 5:
-        log('Starting data collection')
-        print('Working!')
+        collect_data()
+        # print('Working!')
 
 
 if __name__ == '__main__':

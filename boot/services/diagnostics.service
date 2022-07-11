@@ -3,8 +3,8 @@ Description=Pi setup
 After=network.target
 
 [Service]
-WorkingDirectory=/home/pi/boot/
-ExecStart=/usr/bin/python3 /home/pi/boot/setup.py
+WorkingDirectory=/home/pi/
+ExecStart=/usr/bin/python3 /home/pi/diagnostics.py
 User=pi
 
 [Install]

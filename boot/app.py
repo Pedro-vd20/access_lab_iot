@@ -100,6 +100,7 @@ def home():
 
 @app.route('/connect/', methods=['POST'])
 def handle_form():
+    print('here')
     # collect form data
     email = request.form['email']
     network = request.form['network']
