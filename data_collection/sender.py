@@ -2,9 +2,10 @@ import requests as rqs
 import sys
 import os
 import hashlib
+from modules import *
 
 try:
-    from secret import secret
+    from station_id import secret
 except:
     print('PI id not found')
     exit(-1)
@@ -42,35 +43,39 @@ except:
 
 def main(args):
     # collect arg info
-    if (len(args) < 3):
+    if (len(args) < 4):
         print(len(args))
-        print('Missing arguments')
+        log('Missing arguments, stopping sender')
         return -1 
     
-    URL = 'https://' + args[1] + ':3500'
+    URL = 'https://' + args[1] + ':3500/upload'
     FOLDER = args[2]
+    if args[3] not in ('0', '1'):
+        log('Wrong argument, arg3 must be 0 or 1, stopping sender')
+
+    is_diag = args[3] == '1'
 
     # check how many files need to be sent
     try:    
         dir_list = os.listdir(FOLDER)
     except:
-        print(FOLDER, 'not a valid directory')
+        log(FOLDER + ' not a valid directory, stopping sender')
         return -1
     num_files = len(dir_list)
 
     # send authentication request to server
-    headers = {'pi_id': secret}
+    headers = {'pi_id': secret, 'diag': is_diag}
     try:    
         response = rqs.get(URL, headers=headers).text.strip()
     except:
-        print(URL, 'can\'t be reached')
+        log(URL + ' can\'t be reached, stopping sender')
         return -1
     
     print(response)
 
     # check if response is a success
     if(response == '401'): # empty response means error
-        print("Authentication failed")
+        log("Sender authentication failed")
         return -1    # FIGURE OUT WHAT TO DO HERE
         # here we must set some flag to indicate the sending failed for this file
     
@@ -86,9 +91,10 @@ def main(args):
 
 
     # loop through all files
-    for file in dir_list:
+    log('Sending files')
+    for send_file in dir_list:
         # get hash
-        with open(FOLDER + file, 'rb') as f:
+        with open(FOLDER + send_file, 'rb') as f:
             hash_256 = hashlib.sha256(f.read()).hexdigest()
             headers['checksum'] = hash_256
 
@@ -99,24 +105,25 @@ def main(args):
 
         # send request
         try:
-            rsp = rqs.post(URL + '/upload/' + response, 
+            rsp = rqs.post(URL + '/' + response, 
                     files=files, headers=headers).text.strip()
         except:
-            print(URL + '/upload/' + response, 'can\'t be reached')
+            log(URL + '/upload/' + response + ' can\'t be reached')
             return -1
-
-        print(response)
 
         files['sensor_data_file'].close()
 
         # check if success
         if (rsp == '200'):
             # move file to sent folder
-            os.system('mv ' + FOLDER + file + ' ' + DEST_FOLDER)
+            os.system('mv ' + FOLDER + send_file + ' ' + DEST_FOLDER)
+            log(send_file + ' sent')
         else:
-            print(file, 'could not be sent')
+            log(send_file + ' could not be sent')
 
         num_files -= 1
+
+        return 0
         
 
 
