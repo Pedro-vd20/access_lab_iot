@@ -6,7 +6,7 @@ from ACCESS_station_lib import *
 from sensors import *
 from shutil import disk_usage
 from gpiozero import CPUTemperature
-from station_id import secret
+from station_id import *
 from modules import *
 from werkzeug.utils import secure_filename
 
@@ -16,7 +16,7 @@ MAX_SAMPLES = 1
 #------------------------------------------------
 
 def write_diag(error):
-    f = open(HOME + secret + '_diagnostics.txt', 'a')
+    f = open(HOME + 'station' + station_num + '_diagnostics.txt', 'a')
     
     now = datetime.datetime.now()
     f.write(now.strftime('%Y-%m-%d %H:%M:%S,'))
@@ -126,7 +126,7 @@ while True:
         run('sudo systemctl restart diagnostics')
 
     # file name
-    f_name = secure_filename(secret + '_' + curr_date + 'T' + curr_time + 'Z.json')
+    f_name = secure_filename('station' + station_num + '_' + curr_date + 'T' + curr_time + 'Z.json')
     with open(HOME + 'logs/' + f_name, 'w') as f:
         json.dump(data_to_save, f, indent=4)
     

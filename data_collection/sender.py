@@ -7,7 +7,7 @@ from modules import *
 try:
     from station_id import secret
 except:
-    print('PI id not found')
+    log('PI id not found')
     exit(-1)
 
 '''def main():

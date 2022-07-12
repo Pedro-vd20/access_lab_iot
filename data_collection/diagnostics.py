@@ -4,7 +4,7 @@ import json
 import sys
 from shutil import disk_usage
 from gpiozero import CPUTemperature
-from station_id import secret
+from station_id import *
 from werkzeug.utils import secure_filename
 from modules import *
 
@@ -20,12 +20,13 @@ time.sleep(20)
 while True:
     start_measurement_cycle = time.time()
 
-    diag_file = HOME + secret + '_diagnostics.txt'
+    diag_file = HOME + 'station' + station_num + '_diagnostics.txt'
 
     try:
         f = open(diag_file, 'r')
     except:
         log('No diagnostics to send')
+        time.sleep(600)
         continue
 
     f_line = f.readline()
@@ -46,7 +47,7 @@ while True:
     curr_time = f.readline().strip()
     curr_date = f.readline().strip()
 
-    f_name = secure_filename(secret + '_' + curr_date + 'T' + curr_time + 'Z_diagnostics.json')
+    f_name = secure_filename('station' + station_num + '_' + curr_date + 'T' + curr_time + 'Z_diagnostics.json')
 
     run('mv ' + diag_file + ' ' + HOME + 'logs/' + f_name)
     run('touch ' + diag_file)
