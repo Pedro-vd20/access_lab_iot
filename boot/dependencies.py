@@ -13,6 +13,7 @@ def main():
     p_install('pyserial')
     p_install('pigpio')
     p_install('pynmea')
+    p_install('pynmea2')
     p_install('adafruit-circuitpython-bme280')
     p_install('adafruit-circuitpython-ms8607')
 
