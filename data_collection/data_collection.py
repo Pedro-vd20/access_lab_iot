@@ -15,21 +15,38 @@ MAX_SAMPLES = 1
 
 #------------------------------------------------
 
-def write_diag(error):
+def write_diag(error_name, error):
     f = open(HOME + 'station' + station_num + '_diagnostics.txt', 'a')
     
     now = datetime.datetime.now()
-    f.write(now.strftime('%Y-%m-%d %H:%M:%S,'))
-    
+    f.write(now.strftime('%Y-%m-%d %H:%M:%S'))
+    f.write('\n')
+
+    # clean up error
     error = error.replace('\n', ' ')
     error = error.replace('\r', '')
     error = error.replace('\t', ' ')
-
     while '  ' in error:
         error = error.replace('  ', ' ')
 
-    f.write(error)
+    f.write(str(error_name) + '\n')
+    f.write(str(error))
+    f.write('\n\n')
+    f.close()
+
+def write_temp_mem(temp, mem):
+    f = open(HOME + 'station' + station_num + '_diagnostics.txt', 'a')
+    
+    now = datetime.datetime.now()
+    f.write(now.strftime('%Y-%m-%d %H:%M:%S'))
     f.write('\n')
+
+    # write error info
+    f.write('cpu\n')
+    f.write(str(temp))
+    f.write('\nmemory\n')
+    f.write(str(mem))
+    f.write('\n\n')
     f.close()
 
 #-----------------------------------------------
@@ -46,43 +63,48 @@ while True:
 
     print('Collecting NEXTPM data')
     # collect PM data
+    data_to_save['particulate matter'] = []
     for i in range(len(pm)):
         print(i)
         try:
             print('Turning on')
             pm[i].powerON()
             print('collecting data')
-            data = pm[i].measurePM_1_minute()
+            data = pm[i].measure()
+            print(data)
             print('checking humidity')
             if data['sensor_RH'] < 55.0:
                 pm[i].powerOFF()
             print('saving data')
-            data_to_save['particulate_matter_NextPM_' + str(i)] = data
+            data['sensor'] = 'particulate_matter_NEXTPM_' + str(i)
+            data_to_save['particulate matter'].append(data)
             
             # check diagnostics on PM
             print('checking diagnostics')
             for diag in PM_DIAG:
-                if data[diag]:
+                if data['diagnostics'][diag]:
                     send_diag = True
-                    write_diag('PM' + str(i) + ',' + diag)
+                    write_diag('PM' + str(i), diag)
             
         except Exception as e:
             log('Error collecting info for PM ' + str(i))
-            write_diag('PM' + str(i) + ',' + str(e)) 
+            write_diag('PM' + str(i), str(e)) 
             send_diag = True
             
-    print('Collecting air sensor data')
+    # print('Collecting air sensor data')
     # collect air data
+    data_to_save['air_sensor'] = []
     for i in range(len(air_sens)):
         try:
-            data = air_sens[i].measureATM()
-            data_to_save['air_sensor' + str(i)] = data
+            data = air_sens[i].measure()
+            data['sensor'] = 'aris_sensor' + str(i)
+            data_to_save['air_sensor'].append(data)
         except Exception as e:
             log('Error collecting info for air sensor' + str(i))
-            write_diag('air_sensor' + str(i) + ',' + str(e))
+            write_diag('air_sensor' + str(i), str(e))
             send_diag = True
     
-    print('collecting GPS data')
+    # print('collecting GPS data')
     # collect GPS data
     try:
         gps_data = gps.fix()
@@ -91,7 +113,7 @@ while True:
             raise(Exception('Could not fix GPS'))
     except Exception as e:
         log('Error collecting gps data')
-        write_diag('gps,' + str(e))
+        write_diag('gps', str(e))
         send_diag = True
 
     curr_time = gps_data['time']
@@ -110,15 +132,14 @@ while True:
     print('Collecting diagnostics')
     t, u, _ = disk_usage('/')
     memory = u / t
-    write_diag('memory,' + str(memory))
-    if(memory > 0.8):
-        send_diag = True
-
     temp = CPUTemperature().temperature
-    write_diag('temperature,' + str(temp))
-    if(temp > 70):
+    if(temp > 70 or memory > 0.8):
         send_diag = True
-
+        if temp > 70:
+            write_diag('temp', str(temp))
+        if memory > 0.8:
+            write_diag('memory', str(memory))
+    write_temp_mem(str(temp), str(memory))
 
     # check to send diagnostics
     if send_diag:

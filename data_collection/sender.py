@@ -5,9 +5,9 @@ import hashlib
 from modules import *
 
 try:
-    from station_id import secret
+    from station_id import *
 except:
-    log('PI id not found')
+    print('PI id not found')
     exit(-1)
 
 '''def main():
@@ -50,10 +50,7 @@ def main(args):
     
     URL = 'https://' + args[1] + ':3500/upload'
     FOLDER = args[2]
-    if args[3] not in ('0', '1'):
-        log('Wrong argument, arg3 must be 0 or 1, stopping sender')
-
-    is_diag = args[3] == '1'
+    VERIFY = HOME + 'cert.pem'
 
     # check how many files need to be sent
     try:    
@@ -64,9 +61,9 @@ def main(args):
     num_files = len(dir_list)
 
     # send authentication request to server
-    headers = {'pi_id': secret, 'diag': is_diag}
+    headers = {'pi_id': secret, 'pi_num': station_num}
     try:    
-        response = rqs.get(URL, headers=headers).text.strip()
+        response = rqs.get(URL, headers=headers, verify=VERIFY).text.strip()
     except:
         log(URL + ' can\'t be reached, stopping sender')
         return -1
@@ -101,12 +98,12 @@ def main(args):
         headers['num_files'] = str(num_files) # send server num of files left to send
 
         # collect file
-        files = {'sensor_data_file': open(FOLDER + file, 'rb')}
+        files = {'sensor_data_file': open(FOLDER + send_file, 'rb')}
 
         # send request
         try:
             rsp = rqs.post(URL + '/' + response, 
-                    files=files, headers=headers).text.strip()
+                    files=files, headers=headers, verify=VERIFY).text.strip()
         except:
             log(URL + '/upload/' + response + ' can\'t be reached')
             return -1
@@ -123,7 +120,7 @@ def main(args):
 
         num_files -= 1
 
-        return 0
+    return 0
         
 
 

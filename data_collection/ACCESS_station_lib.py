@@ -392,15 +392,20 @@ class NEXTPMbeseecher:
             'PM10mass':   round(0.1*int.from_bytes(res[13:15], 'big'), 1),
             'sensor_T':   round(T, 2),
             'sensor_RH':  round(RH, 2),
-            'Degraded':   res[2] & self.DEGRADED_BIT != 0,
-            'Notready':   res[2] & self.NOTREADY_BIT != 0,
-            'Eccess_RH':  res[2] & self.RH_ERROR_BIT != 0,
-            'T_RH_off':   res[2] & self.TRH_ERROR_BIT != 0,
-            'Fan_error':  res[2] & self.FAN_ERROR_BIT != 0,
-            'Mem_error':  res[2] & self.MEM_ERROR_BIT != 0,
-            'Las_error':  res[2] & self.LAS_ERROR_BIT != 0,
+            'diagnostics': {
+                'Degraded':   res[2] & self.DEGRADED_BIT != 0,
+                'Notready':   res[2] & self.NOTREADY_BIT != 0,
+                'Eccess_RH':  res[2] & self.RH_ERROR_BIT != 0,
+                'T_RH_off':   res[2] & self.TRH_ERROR_BIT != 0,
+                'Fan_error':  res[2] & self.FAN_ERROR_BIT != 0,
+                'Mem_error':  res[2] & self.MEM_ERROR_BIT != 0,
+                'Las_error':  res[2] & self.LAS_ERROR_BIT != 0,
+            }
         }
         
+    def measure(self, time=30):
+        return self._measurePM(self.NextPMcmd['Get_PM_60sec'], time)
+
     def measurePM_10_seconds(self, acquisition_time=30):
         return self._measurePM(self.NextPMcmd['Get_PM_10sec'],
                                acquisition_time)
@@ -463,16 +468,17 @@ class BME280beseecher:
 
     # measure pressure, humidity, and temperature
     # return json dict with the values
-    def measureATM(self) -> dict:
+    def measure(self) -> dict:
         # ERROR: what happens if mode is sleep????
         hum = self.sensor.humidity
         temp = self.sensor.temperature
         prssr = self.sensor.pressure
 
         return {
-            'bme_humidity': hum,
-            'bme_temperature': temp,
-            'bme_pressure': prssr
+            'type': 'bme280',
+            'humidity': hum,
+            'temperature': temp,
+            'pressure': prssr
         }
 
     # return the mode the sensor is currently on
@@ -566,13 +572,28 @@ class MS8607beseecher:
 
     # measure pressure, humidity, and temperature
     # return json dict with the values
-    def measureATM(self) -> dict:
+    def measure(self) -> dict:
         hum = self.sensor.relative_humidity
         temp = self.sensor.temperature
         prssr = self.sensor.pressure
 
         return {
-            'ms_humidity': hum,
-            'ms_temperature': temp,
-            'ms_pressure': prssr
+            'type': 'ms8607',
+            'humidity': hum,
+            'temperature': temp,
+            'pressure': prssr
         }
+
+# Provides an error class that can be initiated when the script fails to 
+# initialize any sensor
+# Only goal is to keep a sensor object so diagnostics can encounter error and send information
+class ErrorBeseecher:
+
+    # Only stores an error message
+    def __init__(self, msg='Error at boot'):
+        # message to display when exception is raised
+        self.message = msg
+
+    def measure(self): # only here to artificially raise an exception
+        raise(Exception(self.message))
+        return {}
