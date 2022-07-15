@@ -97,7 +97,7 @@ while True:
     for i in range(len(air_sens)):
         try:
             data = air_sens[i].measure()
-            data['sensor'] = 'aris_sensor' + str(i)
+            data['sensor'] = 'air_sensor' + str(i)
             data_to_save['air_sensor'].append(data)
         except Exception as e:
             log('Error collecting info for air sensor' + str(i))
