@@ -127,9 +127,9 @@ def handle_form():
 
     # store email for later
     try:
-        f = open(HOME + 'email.txt', 'w')
+        f = open(PATH + 'email.txt', 'w')
     except:
-        f = open(HOME + 'email.txt', 'a')
+        f = open(PATH + 'email.txt', 'a')
     f.write(email)
 
     # create network config file

@@ -1,12 +1,13 @@
 import os
+import sys
 import requests as rqs
 import time
 #import modules
 from modules import *
 import signal
-import socket
 
 NAME='access'
+URL = 'https://10.224.83.51'
 
 # set up Pi as a router for user to connect to
 def router_setup():
@@ -136,36 +137,51 @@ def test_connection():
         log('Could not connect to wifi, reverting to wireless access network')
         f.write('Failed to connect to the network. Make sure the password is correct')
         f.close()
-        write_state(2) 
         
         # reboot pi and change settings
+        write_state(2)
         router_setup()
+        exit(0)
 
     signal.signal(signal.SIGALRM, handler)
     signal.alarm(10) # set timeout timer for request
 
     try:
-        rqs.get('https://google.com') # CHANGE LATER to server IP
-        signal.alarm(0) # turn off alarm
+        if register_email() != '200':
+            raise(Exception('Failed to register email'))
         log('Pi is connected to the internet, starting data collection')
+        signal.alarm(0) # turn off alarm
         # if test network does not time out
         write_state(5)
-        f.close()
-        collect_data()
     except:
         # connected to the router but timeout connecting to the internet
         f.write('The Pi could connect to the wifi but has no access to the internet. Be sure your wifi connection is working properly')
-        f.close()
         write_state(2)
         log('Pi connected to the router but has no access to wifi')
         router_setup()
 
+    f.close()
 
-def collect_data():
-        log('Starting data collection')
-        time.sleep(20)
-        run('sudo systemctl start diagnostics')
-        run('python3 ' + HOME + 'data_collection.py')
+
+# sends collected email address to server and serves to test connection
+def register_email():
+    sys.path.append(HOME)
+    from station_id import secret
+
+    # collect email
+    with open(PATH + 'email.txt', 'r') as f:
+        email = f.readline().strip()
+    
+    url = URL + 'register/'
+    headers = {'pi_id': secret, 'email': email}
+    cert = HOME + 'cert.pem'
+
+    # send
+    log('Sending email to register')
+    rsp = rqs.post(url, verify=cert, headers=headers)
+    return rsp.text
+
+
 
 def main():
     # check state of machine
@@ -193,13 +209,16 @@ def main():
     elif state == 4:
         log('Testing wifi connection')
         test_connection()
-        run('python3 ' + PATH + 'network_diag.py')
     # state 3 will keep Pi as wireless access point but test wifi
     # state 4 will revert pi as router
     # state 5 will start the detection and measurement
     elif state == 5:
-        collect_data()
-        # print('Working!')
+       
+        log('Starting data collection')
+        time.sleep(20)
+        run('sudo systemctl start diagnostics')
+        run('python3 ' + HOME + 'data_collection.py')
+        print('Working!')
 
 
 if __name__ == '__main__':
