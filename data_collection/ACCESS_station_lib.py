@@ -9,6 +9,18 @@ import adafruit_ms8607
 import board
 import busio
 
+# ----- Imports for the sps30 dust sensor. -----
+#download from: https://github.com/dvsu/sps30 (MIT license) and unpack
+#in 'sps30_for_ACCESS', must be a subfolder of the folder containing
+#'ACCESS_station_lib.py'.
+try:
+    import sys
+    sys.path.append('/home/pi/sps30_for_ACCESS')
+    from sps30_for_ACCESS.sps30 import SPS30
+except ModuleNotFoundError:
+    print("SPS30 library not found: you won't be able to use the sps30 dust sensor.")
+# ----- end imports for the sps30 dust sensor. -----
+
 class GPSbeseecher:
     def __init__(self,
                  port = '/dev/ttySOFT0',
@@ -597,3 +609,60 @@ class ErrorBeseecher:
     def measure(self): # only here to artificially raise an exception
         raise(Exception(self.message))
         return {}
+
+#--------------------------------------
+# Sensirion sps30 dust sensor.
+class SPS30beseecher:
+    """Wrapper around the 'SPS30' class (from https://github.com/dvsu/sps30).
+
+Usage: 
+
+sps = SPS30beseecher()
+mydata = sps.measure()
+
+At initialization the i2c bus number may be specified (defaults to 1);
+an auto-cleaning interval may also be specified (defaults to 1 day).
+
+    """
+    #Translations from the sps30 class data dictionary keynames to our keynames.
+    tr_mass  = {'pm1.0':  'PM1mass',
+                'pm2.5':  'PM2.5mass',
+                'pm4.0':  'PM4mass',
+                'pm10': 'PM10mass',
+                }
+    tr_count = {'pm0.5':  'PM0.5count',
+                'pm1.0':  'PM1count',
+                'pm2.5':  'PM2.5count',
+                'pm4.0':  'PM4count',
+                'pm10': 'PM10count',}
+    tr_diag =  {'fan_status':   'Fan_error',
+                'speed_status': 'Spd_error',
+                'laser_status': 'Las_error',
+                }
+    def __init__(self,
+                 i2c_bus_number = 1,
+                 cleaning_interval_in_days = 1
+                 ):
+        # The following raises a 'FileNotFoundError' exception if
+        # the specified i2c bus does not exists.
+        self.sps = SPS30(bus = i2c_bus_number)
+        self.i2c_bus_number = i2c_bus_number 
+        self.sps.write_auto_cleaning_interval_days(cleaning_interval_in_days)
+        self.sps.start_measurement() #we keep the sps30 always on:
+                                     #max power draw 80mA
+                                     
+    def measure(self):
+        sensor_data = self.sps.get_measurement()['sensor_data']
+        results = {}
+        for k in sensor_data['mass_density'].keys():
+            results[self.tr_mass[k]] = sensor_data['mass_density'][k]
+        for k in sensor_data['particle_count'].keys():
+            results[self.tr_count[k]] = sensor_data['particle_count'][k]
+        results['Typical_particle_size'] = sensor_data['particle_size']
+        sensor_diagnostics = self.sps.read_status_register()
+        diag = {}
+        for k in sensor_diagnostics.keys():
+            diag[self.tr_diag[k]] = False if sensor_diagnostics[k] == 'ok' \
+                else True
+        results['diagnostics'] = diag
+        return results

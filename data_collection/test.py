@@ -10,13 +10,13 @@ def main():
         print('Testing Particle Measure Sensors')
         for i in range(len(pm)):
             print('Testing', i)
-            print('Is on:', pm[i].is_ON())
+            print(pm[i].measure())
         print()
 
         print('Testing Air Sensors')
         for i in range(len(air_sens)):
             print('Testing', i)
-            print(air_sens[i].measureATM())
+            print(air_sens[i].measure())
         print()
 
         print('Testing GPS')

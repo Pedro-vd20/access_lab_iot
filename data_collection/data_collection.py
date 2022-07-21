@@ -53,7 +53,6 @@ def write_temp_mem(temp, mem):
 nerror = 0
 
 send_diag = False
-PM_DIAG = ('Degraded', 'Notready', 'Eccess_RH', 'T_RH_off', 'Fan_error', 'Mem_error', 'Las_error')
 
 while True:
     start_measurement_cycle = time.time()
@@ -63,25 +62,26 @@ while True:
 
     print('Collecting NEXTPM data')
     # collect PM data
-    data_to_save['particulate matter'] = []
+    data_to_save['particulate_matter'] = []
     for i in range(len(pm)):
         print(i)
+        is_NEXTPM = type(pm[i]) == NEXTPMbeseecher
         try:
-            print('Turning on')
-            pm[i].powerON()
+            if is_NEXTPM:
+                pm[i].powerON()
             print('collecting data')
             data = pm[i].measure()
             print(data)
             print('checking humidity')
-            if data['sensor_RH'] < 55.0:
+            if is_NEXTPM and data['sensor_RH'] < 55.0:
                 pm[i].powerOFF()
             print('saving data')
-            data['sensor'] = 'particulate_matter_NEXTPM_' + str(i)
-            data_to_save['particulate matter'].append(data)
+            data['sensor'] = 'particulate_matter' + str(i)
+            data_to_save['particulate_matter'].append(data)
             
             # check diagnostics on PM
             print('checking diagnostics')
-            for diag in PM_DIAG:
+            for diag in data['diagnostics'].keys():
                 if data['diagnostics'][diag]:
                     send_diag = True
                     write_diag('PM' + str(i), diag)
@@ -90,6 +90,7 @@ while True:
             log('Error collecting info for PM ' + str(i))
             write_diag('PM' + str(i), str(e)) 
             send_diag = True
+            #raise(e)
             
     # print('Collecting air sensor data')
     # collect air data
