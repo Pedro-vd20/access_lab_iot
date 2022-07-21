@@ -2,33 +2,6 @@
 
 This guide assumes the operating system is Linux, the sender is running off a Raspberry Pi 4.
 
-## CHECKLIST
-
-1. Error codes for sender/receiver DONE
-2. Add email functionality CANCELLED
-3. Add section with all dependencies for pi and local server
-4. Better user-friendly messages while pi reboots / checks for errors
-5. Change test-network in boot to contact receiver rather than google.com
-6. Logging info with error codes?
-7. Add hardware wiring section
-8. Fix state 0 to install all other dependencies
-9. Include images for hardware section
-10. Fix related files to include Access files
-11. Describe logging info (how to access them and all)
-12. Diagnostic file (have Pi send out diagnostics like memory, temp etc once a day)
-13. Complete wrapper class bme280 beseecher and ms8607 beseecher
-14. Change print to log in sender / receiver
-15. Create folder structure for sender once all files are accounted for.
-16. Create access email for this
-17. Change sender section to Access station section
-18. Basically rewrite whole Access Station section
-19. Detal OS specifications and dependency versions
-20. List the different sites the receiver hosts (upload, home page, etc)
-21. Add files that the boot creates for temp purposes
-22. Is it possible for pi not to reboot after all the changes and stuff??? would greatly speed up
-1. Add whole section on setting up ports and stuff
-1. Test script for sensors
-1. Add server website to see station
 
 ## Receiver
 
@@ -58,16 +31,15 @@ $ sudo apt-get install python3-pip
 
 * Flask 2.1.2
 * werkzeug 2.1.2
-* pyopenssl 
-* os
-* random
-* string
+* numpy 1.22.4
+* ssl
 
 #### Installation
 
 ```console
 $ pip3 install Flask
 $ pip3 install pyopenssl 
+$ pip3 install numpy
 ```
 
 ### Setting up
@@ -185,6 +157,93 @@ ___
 
 The Access Stations have two main modes: boot and data collection.
 
+### Dependencies
+
+The access stations are running 
+    
+* Python 3.9.2
+* pip3 20.0.2
+* Raspbian GNU/Linux 11 (bullseye)
+
+Python dependencies
+* Flask 2.1.2
+* requests 2.25.1
+* pyserial 3.5
+* pigpio 
+* pynmea
+* adafruit_bme280
+* adafruit_ms8607
+
+Other dependencies
+* hostapd 2:2.9.0-21
+* dnsmasq 2.85-1
+* pigpiod 1.79-1+rpt1
+
+### Folder Structure
+
+```console
+/home/pi/
+ |-- boot/
+ |   |-- app.py
+ |   |-- dependencies.py
+ |   |-- modules.py
+ |   |-- setup.py
+ |   |-- state.txt
+ |   |-- services/
+ |   |   |-- flask_app.service
+ |   |   |-- setup.service 
+ |   |-- static/
+ |   |   |-- app.js
+ |   |   |-- styles.css
+ |   |   |-- images/
+ |   |   |   |-- ACCESS_LOGO_SQUARE_violet_drop1.png
+ |   |-- templates/
+ |   |   |-- index.html
+ |   |   |-- no_networks.html
+ |   |   |-- testing_wifi.html
+ |-- ACCESS_station_lib.py
+ |-- cert.pem
+ |-- data_collection.py
+ |-- diagnostics.py
+ |-- modules.py
+ |-- sender.py
+ |-- sensors.py 
+ |-- station_id.py
+ |-- test.py
+ |-- logs/
+ |   |--
+ |-- sent_files/
+ |   |--
+ |--
+```
+
+### Related Files
+
+All files inside the boot folder will setup the Access Station.
+
+* `boot/app.py`: small flask server whos only purpose is to collect the wifi information from the user in order to connect.
+* `boot/dependencies.py`: Installs all necessary dependencies and moves necessary services to `/lib/systemd/system/`.
+* `boot/modules.py`: shared code and constants imported by other python files.
+* `boot/setup.py`: main driver for setting up the access stations. Checks the current state of the machine and continues with next steps by running other files / executing commands.
+* `boot/state.txt`: stores the current state of the station. If the file is non-existant, the state is assumed as 0. States can range from 0 to 5.
+* `boot/services/*`: system services to automatically run the setup and the flask app each time the station boots.
+* `boot/static/*`: resources for the flask app such as images, stylesheets, and javascript code.
+* `boot/templates/*`: html pages for the flask app to render.
+* `sent_files/`: folder to store successfully sent files.
+* `logs/`: stores data collected
+* `ACCESS_station_lib.py`: wrapper classes to connect and interact with the sensor's hardware.
+* `cert.pem`: self-signed certificate used by the server for https.
+* `data_collection.py`: collects information from the sensors every 10 minutes.
+* `sender.py`: sends data collected to the receiver server.
+* `sensors.py`: initializes sensors, to be configured/modified depending on which sensors are connected where.
+* `station_id.py`: contains the Pi's unique 16-digit hexadecimal ID and the station number, must be set manually.
+    
+        secret = '4820FA34CB9D873E'
+        station_num = '3' # must be as string
+
+* `test.py`: tests to see if all the connections to the hardware are working well.
+
+
 ### Setting Up
 
 This guide will follow the steps from boot up to operation required to set up the Access Station.
@@ -198,9 +257,8 @@ This guide will follow the steps from boot up to operation required to set up th
     ```
     1. Enable `Interface Options`->`SSH`
     1. Enable `Interface Options`->`I2C`
-    1. In `Interface Options`->`Serial Port` disable login shell but enable serial port hardware.
-    1. Configure `Localisation Options`->`WLAN Country`
-    1. Enable 
+    1. In `Interface Options`->`Serial Port`, disable login shell but enable serial port hardware.
+    1. Configure `Localisation Options`->`WLAN Country.
 
 1. Connect to the network.
     ```console
@@ -225,7 +283,14 @@ This guide will follow the steps from boot up to operation required to set up th
 
     Then reboot the RPi to connect and implement the settings from step (2).
 
-1. Download the necessary files and setup the folder structure as described [here](#folder-structure)
+1. Download the necessary files and setup the folder structure as described [here](#folder-structure). BGe sure to give the RPi its unique ID, and update the server to accept this ID.
+    
+    To download the certificate file from the server, scp the file.
+    
+    ```console
+    $ scp user@server_ip:path_to_cert/cert.pem /home/pi/
+    $ export REQUESTS_CA_BUNDLE=/home/pi/cert.pem
+    ```
 
 1. Make sure Python3 and pip3 are properly installed.
 
@@ -264,138 +329,39 @@ This guide will follow the steps from boot up to operation required to set up th
 
 1. Connect the RPi to the sensors
     
-    WHAT DEVICES GO WHERE LIST PINS HERE
+    1. GPS can be connected to a GPIO pin. The `ACCESS_staion_lib` uses `GPIO 27` as default, and only connects to the GPS' output.
+    1. The particle measurement sensors are connected to uart0 (`/dev/ttyAMA0`) and uart2 (`/dev/ttyAMA1`), corresponding to pins `GPIO 14` / `GPIO 15` and `GPIO 0` / `GPIO 1` respectively.
+    1. The air sensors (temperature, humidity, and pressure) are connected to the I2C pins, `GPIO 2` and `GPIO 3`. Both are connected throught the bret board, as the Waveshare BME280 can be configured to use address `0x77` while the MS 8607 uses `0x76`.
+    
+    Modify `sensors.py` to properly initialize each sensor, depending on how they where plugged in.
 
-1. Run `test.py` to do a quick test of all the hardware. If the RPi reboots, the hardware testing was successful.
+1. Run `test.py` to do a quick test of all the hardware. If the RPi reboots, the hardware testing was successful. It may take some time while sensors such as the GPS calibrate.
 
-1. Wait to see if it becomes a wireless access station. If the `access` network becomes visible, the station has been successfully set up.
-___
+1. Start the setup mode.
+    ```console
+    $ sudo systemctl enable setup
+    $ sudo systemctl start setup
+    ```
 
-The Access Stations have two main modes: boot and data collection.
-
-### Folder Structure
-
-```console
-/home/pi/
- |-- boot/
- |   |-- app.py
- |   |-- dependencies.py
- |   |-- modules.py
- |   |-- setup.py
- |   |-- state.txt
- |   |-- services/
- |   |   |-- flask_app.service
- |   |   |-- setup.service 
- |   |-- static/
- |   |   |-- app.js
- |   |   |-- styles.css
- |   |   |-- images/
- |   |   |   |-- ACCESS_LOGO_SQUARE_violet_drop1.png
- |   |-- templates/
- |   |   |-- index.html
- |   |   |-- no_networks.html
- |   |   |-- testing_wifi.html
- |-- ACCESS_station_lib.py
- |-- data_collection.py
- |-- sender.py
- |-- station_id.py
- |-- test.py
- |
-```
-
-### Installing Dependencies
-
-The Access Station must have python3 and pip3 installed.
-
-```console
-$ sudo apt-get update
-$ sudo apt-get upgrade
-$ sudo apt-get install python3
-$ sudo apt-get install python3-pip
-```
-
-#### Dependencies
-
-Python dependencies
-* Flask 2.1.2
-* requests 2.25.1
-* pyserial 3.5
-* pigpio 
-* pynmea
-* adafruit_bme280
-* adafruit_ms8607
-
-Other dependencies
-* hostapd 2:2.9.0-21
-* dnsmasq 2.85-1
-* pigpiod 1.79-1+rpt1
-
+### Hardware
 
 
 ### Boot Mode
 
-The first mode of the Access Station is boot mode. Here the station goes through the installation of required dependencies, settings configuration, and connection to wifi once deployed in a new location.
-
-#### Related Files
-
-All files inside the boot folder will setup the Access Station.
-
-* `app.py`: small flask server whos only purpose is to collect the wifi information from the user in order to connect.
-* `modules.py`: shared code and constants imported by other python files.
-* `setup.py`: main driver for setting up the access stations. Checks the current state of the machine and continues with next steps by running other files / executing commands.
-* `state.txt`: stores the current state of the station. If the file is non-existant, the state is assumed as 0. States can range from 0 to 5.
-* `services/`: system services to automatically run the setup and the flask app each time the station boots.
-* `static/`: resources for the flask app such as images, stylesheets, and javascript code.
-* `templates/`: html pages for the flask app to render.
-
-
-
-The boot process will use various other files for quick storage of network status and information.
+The first mode of the access station is boot mode. Here the goal of the station is to connect to a new wifi.
 
 #### States
 
+The boot process has 5 states, ruling what the RPi will do in that step.
 
-
-
-The sender uses the Python requests module to securely send the data collected by the Pi to the main server.
-
-### Related Files
-* `sender.py`: script to send files to a remote server.
-* `secret.py`: contains simply 1 line of code, storing the Pi's 16-digit hexadecimal id.
-* `sent_files/`: directory where all the files are moved after they are successfully sent.
-
-### Installing dependencies
-
-The sender must have python3 and pip3 installed and updated.
-
-#### Dependencies
-* requests
-* Flask
-* hostapd
-* dnsmasq
-* pigpiod
-* serial
-* pigpio
-* pynmea2
-* adafruit_bme280
-* adafruit_ms8607
-* google
-* google-auth
-* google-api-python-client
+1.  The RPi will configure itself to run as a wireless access point and automatically reboot to enact changes.
+2. The RPi will act as a router and server, hosting the flask website `app.py` to collect wifi information. Users can connect to the `access` network and visit `http://192.168.4.1:3500`. Here, the user can input the necessary information for the RPi to connect to their wifi.
+3. The RPi will revert back from a wireless access point, necessary to test the wifi information given.
+4. The access station will attempt to connect to the wifi and contact the main server. If this fails, the RPi will return to state 1. If it works, the main server will register the user's email and move to state 5.
+5. The access station is now connected to the internet and will collect/send data.
 
 ___
 
-* google-auth-httplib2
-* google-auth-oauthlib
-
-```console
-$ pip3 install requests
-$ pip3 install google-auth
-$ pip3 install google-api-python-client
-$ pip3 install google-auth-httplib2
-$ pip3 install google-auth-oauthlib
-$ sudo apt-get -y pigpiod
-```
 
 ### Setting up
 
@@ -408,10 +374,7 @@ When running the code, if the sender cannot find `sent_files/`, it will create i
 
 The final step is installing the self-signed certificate created by the receiver. This will allow the sender to trust the identity of the server. The certificate can be installed anywhere, but for ease, should be placed in the same directory as `sender.py`.
 
-```console
-$ scp user@server_ip:path_to_cert/cert.pem path_to_store_certificate/
-$ export REQUESTS_CA_BUNDLE=/absolute_path_to_certificate/cert.pem
-```
+
 
 ### Running the sender
 
@@ -426,6 +389,8 @@ $ python3 path_to_sender/sender.py arg1 arg2
 `arg2` is the path where data is stored.
 
 `arg2` can be absolute or relative from wherever `sender.py` will be called. If `arg2 = /home/pi/logs/` then `sent_files/` must be located at `/home/pi/sent_files`. If this directory does not exist, `sender.py` will create it.
+
+`arg3` is either 0 or 1. This flag signals wheter the file being sent is diagnositc (1) or not (0)
 
 ### Possible errors
 
