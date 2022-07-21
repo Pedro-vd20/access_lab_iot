@@ -7,7 +7,7 @@ from modules import *
 import signal
 
 NAME='access'
-URL = 'https://10.224.83.51'
+URL = 'https://10.224.83.51:3500/'
 
 # set up Pi as a router for user to connect to
 def router_setup():
