@@ -1,148 +1,141 @@
+[comment]: <ACCESS Lab, hereby disclaims all copyright interest in the program “ACCESS IOT Stations” (which collects air and climate data) written by Francesco Paparella, Pedro Velasquez. Copyright (C) 2022 Francesco Paparella, Pedro Velasquez>
+
 # Access Lab Measurement Stations
 
-This guide assumes the operating system is Linux, the sender is running off a Raspberry Pi 4.
+Version 1.0
 
+Version 2.0 will focus on implementing mongodb rather than storing files locally.
 
 ## Receiver
 
-The receiver is a Flask server waiting for the various Access Stations to authenticate themselves and send data collected in the form of `.csv`, `.txt`, or `.json` files. It also receives diagnostics from the stations. Additionally, it allows users to see the data collected by the station they're hosting.
+The receiver is a Flask server waiting for the various Access Stations to authenticate themselves and send data collected in the form of JSON files. It also receives diagnostics from the stations. Additionally, it allows users to see the data collected by the station they're hosting. The receiver then acts as a middle-man, taking data from the stations and uploading them to a publicly available database.
 
-### Related Files
-* `ids.csv`: contains list of all PI ids and their registered email for server to check.
-* `receiver.py`, `temp_upload.py`: older versions of the receiver, non-functioning.
-* `upload.py`: flask server to manage receiving files.
-* `register.py`: generates new random id for brand new access stations. 
-* `logs.txt`: if non-existant, `upload.py` will create it and write errors or important info on it.
-* `received_files/`: directory where flask server will save both sha256 checksums and data collected.
+### Dependencies
 
+The is running 
+* Python 3.8.10
+* pip3 20.0.2
+* Raspbian GNU/Linux 11 (bullseye)
 
-### Installing dependencies
+Python dependencies
+* Flask 2.1.2
+* werkzeug 2.1.2
+* numpy 1.22.4
+* pandas 0.25.3
+* ssl
 
-The server must have python3 and pip3 installed.
+#### Installation
 
 ```console
 $ sudo apt-get update
 $ sudo apt-get upgrade
 $ sudo apt-get install python3
 $ sudo apt-get install python3-pip
+$
+$ pip3 install Flask
+$ pip3 install numpy
+$ pip3 install pandas
 ```
 
-#### Dependencies
-
-* Flask 2.1.2
-* werkzeug 2.1.2
-* numpy 1.22.4
-* ssl
-
-#### Installation
+### Folder Structure
 
 ```console
-$ pip3 install Flask
-$ pip3 install pyopenssl 
-$ pip3 install numpy
+./
+ |-- cert.pem
+ |-- ids.json
+ |-- key.pem
+ |-- logs.txt
+ |-- read_station_data.py
+ |-- receiver.py
+ |-- received_files/
+ |   |-- station0/
+ |   |   |--
+ |   |-- station1/
+ |   |   |--
+ |   </>
+ |   |-- station<n>/
+ |   |   |--
+ |-- diagnostics/
+ |   |-- station0/
+ |   |   |--
+ |   </>
+ |   |-- station<n>/
+ |   |   |--
+ | --
+ |
 ```
+
+### Related Files
+* `cert.pem`: self-signed certificate for the HTTPS connection.
+* `key.pem`: private key to go along with `cert.pem`.
+* `ids.json`: contains all PI ids, station number, and their registered email for server to check.
+* `logs.txt`: if non-existant, `receiver.py` will create it and write errors or important info on it.
+* `read_station_data.py`: module with methods to fetch all the data from a specific station.
+* `receiver.py`: flask server to receive data and diagnostic files, show users data collected, and upload information to the database.
+* `received_files/`: directory where flask server will save both sha256 checksums and data collected. Files from station `i` will be stored in the subdirectory `received_files/stationi`
+* `diagnostics/`: directory where server saves sha256 checksums and diagnostics collected. Files from station `i` will be stored in subdirectory `diagnostics/stationi`.
+
 
 ### Setting up
 
-Before running the server, please make sure the following three files/directories must be in the same path:
+The code uses relative paths so it's essential these files and programs run from the same path where `receiver.py` is stored.
 
-```console
-./
- |-- upload.py
- |-- ids.csv
- |-- register.py
- |-- logs.txt
- |-- received_files/
- |   |--
- |
-```
+1. Set environment variables.
+    ```console
+    $ export FLASK_APP=receiver.py
+    ```
 
-The code uses relative paths so it's essential these files are in the same directory.
+2. Generate self-signed certificate using pyopenssl.
 
-For Flask to run, you must set up the `FLASK_APP` environment variable.
+    ```console
+    $ openssl req -x509 -newkey rsa:4096 -nodes -out cert.pem -keyout key.pem -days 3652 
+    ```
 
-```console
-$ export FLASK_APP=upload.py
-```
+    This leads to the following prompt to fill in:
 
-It is also possible to use `upload.py`'s absolute path, though this is not necessary as the Flask app is expected to be run from the same directory.
+    ```console
+    Generating a RSA private key
+    ....++++
+    .........................................................................................................................................++++
+    writing new private key to 'key.pem'
+    -----
+    You are about to be asked to enter information that will be incorporated
+    into your certificate request.
+    What you are about to enter is what is called a Distinguished Name or a DN.
+    There are quite a few fields but you can leave some blank
+    For some fields there will be a default value,
+    If you enter '.', the field will be left blank.
+    -----
+    Country Name (2 letter code) [AU]:AE
+    State or Province Name (full name) [Some-State]:Abu Dhabi
+    Locality Name (eg, city) []:Abu Dhabi
+    Organization Name (eg, company) [Internet Widgits Pty Ltd]:Access
+    Organizational Unit Name (eg, section) []:Access
+    Common Name (e.g. server FQDN or YOUR name) []:ip_addr
+    Email Address []:
+    ```
 
-Next step is to generate a self-signed certificate for the server to use. Using pyopenssl, we can create both a certificate and private key using the following:
+    `ip_addr` must be the server's ip address.
 
-```console
-$ openssl req -x509 -newkey rsa:4096 -nodes -out cert.pem -keyout key.pem -days 3652 
-```
-
-Running the line above will lead to the following prompts to fill in:
-
-```
-Generating a RSA private key
-....++++
-.........................................................................................................................................++++
-writing new private key to 'key.pem'
------
-You are about to be asked to enter information that will be incorporated
-into your certificate request.
-What you are about to enter is what is called a Distinguished Name or a DN.
-There are quite a few fields but you can leave some blank
-For some fields there will be a default value,
-If you enter '.', the field will be left blank.
------
-Country Name (2 letter code) [AU]:AE
-State or Province Name (full name) [Some-State]:Abu Dhabi
-Locality Name (eg, city) []:Abu Dhabi
-Organization Name (eg, company) [Internet Widgits Pty Ltd]:Access
-Organizational Unit Name (eg, section) []:Access
-Common Name (e.g. server FQDN or YOUR name) []:ip_addr
-Email Address []:
-```
-
-`ip_addr` must be the server's ip address.
-
-`cert.pem` and `key.pem` should be created following this. Never share `key.pem`. In the [Sender](#setting-up-1) section, we will cover how to send the certificate to the Access Stations. This new certificate-key pair should last for about 10 years (3652 days). Typically a shorter expiry is recommended, but for testing and for this lab, 10 years will be chosen. The current certificates will expire on May 2032 and must be replaced in all stations.
+    In the [Sender](#setting-up-1) section, we will cover how to send the certificate to the Access Stations. This new certificate-key pair should last for about 10 years (3652 days). Typically a shorter expiry is recommended, but for testing and for this lab, 10 years will be chosen. The current certificates will expire on May 2032 and must be replaced in all stations.
 
 ### Running the receiver
 
-Make sure to change your current directory to the same as `upload.py`. 
-
-```console
-./
- |-- upload.py
- |-- ids.csv
- |-- register.py
- |-- cert.pem
- |-- key.pem
- |-- logs.txt
- |-- received_files/
- |   |--
- |
-````
-
-Then run:
+Make sure to change your current directory to the same as `receiver.py`. 
 
 ```console
 $ flask run --host=my_ip --port=3500 --cert=cert.pem --key=key.pem
 ```
 
-For this project, the port to be used has been defined as 3500. This will always be the case. `my_ip` should be the public IP address of the server. This will run the project in development mode and is fine for now while testing occurs. Later, the project must be deployed as production version, as this one is more stable and secure.
+`my_ip` should be the public IP address of the server.
 
-### Possible errors
+Some operating systems have port 443 (HTTPS) reserved, thus to avoid any possible errors, this project will use arbitrarily chosen port `3500`.
 
-The following errors will be logged into the receiver's log files.
+This will run the app in development mode. This is not recommended as it is less stable. However, for the time being and for testing purposes, it will do.
 
-* `Error finding files and folders`: receiver could not find `ids.csv` or the folder `received_files/`. The server will not run. Please make sure `uplodad.py`, `received_files/`, and `ids.txt` are all in the same directory and that the server 
-* `Unauthorized access, rejected`: receiver failed to find a valid pi_id in the request. The request is ignored.
+#### Response Codes
 
-The rest of the errors assume successful validation
-
-* `Required files not included`: The request to send a file does not include the file or the checksum. File does not get downloaded, request is ignored.
-* `Empty file or checksum fields`: the file and checksum are not missing but are left empty by the sender. Request gets ignored.
-* `Wrong file type`: the sent file is of the wrong type. Request is ignored.
-* `Wrong checksum`: the checksum sent does not match the sent file. The file is not downloaded and the request is ignored.
-
-### Response Codes
-
-The receiver will respond with any of the following response codes:
+The receiver will respond with any of the following codes:
 
 * `200`: request successful, files received and verified.
 * `301 new_url`: the request was received successfully and the file should be sent to `/upload/new_url`.
@@ -150,6 +143,20 @@ The receiver will respond with any of the following response codes:
 * `412`: precondition failed, files to receive not sent in request.
 * `415`: unsopported file type received, request rejected.
 * `500`: error receiving file, checksum could not be verified.
+
+#### Possible errors
+
+The following errors will be logged into the receiver's log files.
+
+* `Error finding files and folders`: receiver could not find `ids.csv` or the folder `received_files/`. The server will not run. Please make sure `uplodad.py`, `received_files/`, and `ids.txt` are all in the same directory and that the server 
+* `Unauthorized access, rejected`: receiver failed to find a valid pi_id in the request. The request is ignored.
+
+The rest of the errors assume successful validation of the station.
+
+* `Required files not included`: The request to send a file does not include the file or the checksum. File does not get downloaded, request is ignored.
+* `Empty file or checksum fields`: the file and checksum are not missing but are left empty by the sender. Request gets ignored.
+* `Wrong file type`: the sent file is of the wrong type. Request is ignored.
+* `Wrong checksum`: the checksum sent does not match the sent file. The file is not downloaded and the request is ignored.
 
 ___
 
