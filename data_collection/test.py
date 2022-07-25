@@ -21,6 +21,7 @@ You should have received a copy of the GNU General Public License along with
 
 '''
 
+
 import ACCESS_station_lib as access
 from sensors import *
 from modules import log
@@ -33,7 +34,7 @@ def main():
         print('Testing Particle Measure Sensors')
         for i in range(len(pm)):
             print('Testing', i)
-            print(pm[i].measure())
+            print('Is on:', pm[i].is_ON())
         print()
 
         print('Testing Air Sensors')
