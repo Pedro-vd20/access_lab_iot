@@ -162,7 +162,7 @@ while True:
         if temp > 70:
             write_diag('temp', str(temp))
         if memory > 0.8:
-            write_diag('memory', str(memory))
+            write_diag('disk_space', str(memory))
     write_temp_mem(str(temp), str(memory))
 
     # check to send diagnostics

@@ -72,7 +72,7 @@ while True:
     diagnostics = {
         'id': secret,
         'cpu_temp': [],
-        'memory': [],
+        'disk_space': [],
         'time': [],
         'date': [],
         'errors': {
@@ -99,7 +99,7 @@ while True:
             mem = group[4].strip()
 
             diagnostics['cpu_temp'].append(cpu)
-            diagnostics['memory'].append(mem)
+            diagnostics['disk_space'].append(mem)
             diagnostics['time'].append(time_date[1])
             diagnostics['date'].append(time_date[0])
 
