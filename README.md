@@ -12,10 +12,10 @@ The receiver is a Flask server waiting for the various Access Stations to authen
 
 ### Dependencies
 
-The is running 
+The receiver is running 
 * Python 3.8.10
 * pip3 20.0.2
-* Raspbian GNU/Linux 11 (bullseye)
+* Ubuntu 20.04.4 LTS (Focal Fossa)
 
 Python dependencies
 * Flask 2.1.2
@@ -133,6 +133,17 @@ Some operating systems have port 443 (HTTPS) reserved, thus to avoid any possibl
 
 This will run the app in development mode. This is not recommended as it is less stable. However, for the time being and for testing purposes, it will do.
 
+#### Receiver Subdirectories
+
+* `/`:  Presents users with a search bar to view their station's data. Currently unimplemented.
+* `/view/station<i>`: dynamic url to view each station. `<i>` is to be replaced by the station's number. Currently unimplemented.
+* `/register/`: new stations will send their information here to:
+    
+        a) allow the station to test if it's connected to the internet.
+        b) map the user's email to a given station, allowing the user to find and view their station's data.
+* `/upload/`: stations contact this subdirectory to request an upload channel. The receiver will authenticate the station using the hexadecimal ids and return a random string.
+* `/upload/<rand_str>`: temporary subdirectorys created to upload files. The server performs integrity tests (sha256 checksums) before accepting files sent here.
+
 #### Response Codes
 
 The receiver will respond with any of the following codes:
@@ -140,7 +151,7 @@ The receiver will respond with any of the following codes:
 * `200`: request successful, files received and verified.
 * `301 new_url`: the request was received successfully and the file should be sent to `/upload/new_url`.
 * `401`: unathorized request. The server will ignore the request.
-* `412`: precondition failed, files to receive not sent in request.
+* `412`: precondition failed, files/headers necessary not sent in request.
 * `415`: unsopported file type received, request rejected.
 * `500`: error receiving file, checksum could not be verified.
 
@@ -148,7 +159,7 @@ The receiver will respond with any of the following codes:
 
 The following errors will be logged into the receiver's log files.
 
-* `Error finding files and folders`: receiver could not find `ids.csv` or the folder `received_files/`. The server will not run. Please make sure `uplodad.py`, `received_files/`, and `ids.txt` are all in the same directory and that the server 
+* `Error finding files and folders`: receiver could not find `ids.json` or the folder `received_files/`. The server will not run. Please make sure `uplodad.py`, `received_files/`, and `ids.txt` are all in the same directory and that the server 
 * `Unauthorized access, rejected`: receiver failed to find a valid pi_id in the request. The request is ignored.
 
 The rest of the errors assume successful validation of the station.
@@ -352,14 +363,23 @@ This guide will follow the steps from boot up to operation required to set up th
 
 ### Hardware
 
+Be sure to enable all pins being used. By default, RPis have only 1 UART port enabled (necessary for the particulate matter sensors). Be sure the miniUART port is also not assigned to the pins the sensor is using. [setup](#setting-up-1) covers how to change to mapping of the pins from `ttyS0` to the desired `ttyAMA0`.
+
+As more sensors and fans are connected to the RPi, be sure to use the appropriate cables to supply the adequate voltage and current. Otherwise, the RPi can get stuck in boot.
+
+The prototype station built has the following sensors and connections:
+
+1. 2 NEXT PM sensors
+1. 1 BME280 sensor
+1. 1 MS8607 sensor
+1. 1 GPS sensor
+1. 2 5V fan
+
+![](ACCESSstation_wiring-1.jpg)
 
 ### Boot Mode
 
-The first mode of the access station is boot mode. Here the goal of the station is to connect to a new wifi.
-
-#### States
-
-The boot process has 5 states, ruling what the RPi will do in that step.
+Boot mode runs every time the Pi starts up. It goes through 5 different possible states to configure the RPi and start up data collection.
 
 1.  The RPi will configure itself to run as a wireless access point and automatically reboot to enact changes.
 2. The RPi will act as a router and server, hosting the flask website `app.py` to collect wifi information. Users can connect to the `access` network and visit `http://192.168.4.1:3500`. Here, the user can input the necessary information for the RPi to connect to their wifi.
@@ -367,43 +387,20 @@ The boot process has 5 states, ruling what the RPi will do in that step.
 4. The access station will attempt to connect to the wifi and contact the main server. If this fails, the RPi will return to state 1. If it works, the main server will register the user's email and move to state 5.
 5. The access station is now connected to the internet and will collect/send data.
 
-___
-
-
-### Setting up
-
-Before running the sender, please make sure the following three files/directories must be in the same path:
-
-1. `sender.py`
-3. `secret.py`
-
-When running the code, if the sender cannot find `sent_files/`, it will create it in the same directory as the directory of unsent files. The [next section](#running-the-sender) will further discuss this file structure.
-
-The final step is installing the self-signed certificate created by the receiver. This will allow the sender to trust the identity of the server. The certificate can be installed anywhere, but for ease, should be placed in the same directory as `sender.py`.
-
-
-
-### Running the sender
-
-Unlike receiver, the sender can be run from any path.
-
-```console
-$ python3 path_to_sender/sender.py arg1 arg2 
-```
-
-`arg1` is the ip address of the server.
-
-`arg2` is the path where data is stored.
-
-`arg2` can be absolute or relative from wherever `sender.py` will be called. If `arg2 = /home/pi/logs/` then `sent_files/` must be located at `/home/pi/sent_files`. If this directory does not exist, `sender.py` will create it.
-
-`arg3` is either 0 or 1. This flag signals wheter the file being sent is diagnositc (1) or not (0)
+### Data Collection
+![](data_collection.png)
 
 ### Possible errors
 
+Data Collection:
+* If at boot, `sensors.py` fails to contact a sensor, rather than initiating the appropriate beseecher class, it initiates that sensor as an `ErrorBeseecher` object, storing the error information. During each data collection cycle, it will raise this error.
+* During data collection, when polling sensors, if the CPU temperature is too high (`> 70°`), the disk space is too full (`> 80%`), or an exception is raised (wheter from the ErrorBeseecher class or a runtime error with the sensor), the error is logged into the diagnostics file and sent to the server.
+
+Sending data:
 * `PI id not found`: the sender failed to import its own id. The script will stop running. Make sure the file `secret.py` is in the same directory as `sender.py` and has the following: `secret='pi_id'` where pi_id is a 16-digit hexadecimal string.
 * `Missing arguments`: the sender did not get the required arguments. The script will stop running.
 * `arg2 not a valid directory`: sender could not access the folder with the logs to send. The script will stop running.
 * `https://arg1:3500 could not be reached`: sender could not reach flask receiver, the script stops running 
 * `Authentication failed`: server was unable to verify Pi's identity, sender stops running
 * `file_name could not be sent`: error verifying checksum of sent file. Sender will simply keep that file in the logs folder rather than moving it to the directory of sent files. The script will continue to run, sending other files. This unsent file will be sent the next time the script runs.
+
