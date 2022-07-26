@@ -28,8 +28,8 @@ import time
 import pynmea2
 from pynmea2.nmea import ChecksumError, ParseError
 from datetime import datetime
-from adafruit_bme280 import advanced as adafruit_bme280
-import adafruit_ms8607
+from adafruit_bme280 import advanced as adafruit_bme280 #pip3 install adafruit-circuitpython-bme280
+import adafruit_ms8607   #pip3 install adafruit-circuitpython-ms8607
 import board
 import busio
 
@@ -45,6 +45,7 @@ except ModuleNotFoundError:
     print("SPS30 library not found: you won't be able to use the sps30 dust sensor.")
 # ----- end imports for the sps30 dust sensor. -----
 
+#------------------------------------------------------
 class GPSbeseecher:
     def __init__(self,
                  port = '/dev/ttySOFT0',
@@ -243,13 +244,15 @@ class NEXTPMbeseecher:
     pm.measurePM_10_seconds() - measures PM1, PM2.5, PM10 averaging over 10 s
     pm.measurePM_1_minute()   - measures PM1, PM2.5, PM10 averaging over 1 m
     pm.measurePM_15_minutes() - measures PM1, PM2.5, PM10 averaging over 15 m
+    pm.measure() - alias for pm.measurePM_1_minute() 
     pm.get_firmware_version() - returns a hex number in a 4-character string
 
     Note that the measurement methods are blocking, for a time
-    comparable or longer than the nominal averaging time. Hoewever, if the
-    sensor has been powered on for longer than the averaging time, the
-    data may already be present in the sensor's memory and the reply would
-    be much faster.
+    comparable or longer than the nominal averaging time, determined
+    by 'acquisition_time' parameter (in sec.) in the call of the
+    '.measurePM_XXX' methods. Hoewever, if the sensor has been powered
+    on for longer than the averaging time, the data may already be
+    present in the sensor's memory and the reply would be much faster.
 
     Upon instantiation the on/off state of the hardware is not
     changed. However, the measurement methods will take about the nominal
@@ -300,6 +303,7 @@ class NEXTPMbeseecher:
                  bytesize = serial.EIGHTBITS,
                  timeout = 1.0
                  ):
+        self.port = port
         self.serialprms = {
             'port':     port,
             'baudrate': baudrate,
@@ -342,7 +346,7 @@ class NEXTPMbeseecher:
             time.sleep(sleep_time*(i+1))
         else:
             raise ValueError(f"""
-                NextPM replied an empty string or failed the checksum. 
+                NextPM on port {self.port} replied an empty string or failed the checksum. 
                 Last reply after {N_attempts} was:
                 {rply}
             """)
@@ -439,9 +443,6 @@ class NEXTPMbeseecher:
             }
         }
         
-    def measure(self, time=120):
-        return self._measurePM(self.NextPMcmd['Get_PM_60sec'], time)
-
     def measurePM_10_seconds(self, acquisition_time=30):
         return self._measurePM(self.NextPMcmd['Get_PM_10sec'],
                                acquisition_time)
@@ -449,6 +450,9 @@ class NEXTPMbeseecher:
     def measurePM_1_minute(self, acquisition_time=120):
         return self._measurePM(self.NextPMcmd['Get_PM_60sec'],
                                acquisition_time)
+
+    #default measurement method is 1 minute.
+    measure = measurePM_1_minute
         
     def measurePM_15_minutes(self, acquisition_time=1000):
         return self._measurePM(self.NextPMcmd['Get_PM_900sec'],
@@ -588,6 +592,9 @@ class BME280beseecher:
         self.sensor.overscan_pressure = overscan
         return True
 
+#-------------------------------------------------
+# wrapper class for the humidity-temperature-pressure sensor ms8607
+# requires the package adafruit-circuitpython-ms8607
 class MS8607beseecher:
 
     # i2c -> board.I2C() for the raspberry pi
