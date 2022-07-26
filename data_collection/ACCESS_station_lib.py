@@ -439,7 +439,7 @@ class NEXTPMbeseecher:
             }
         }
         
-    def measure(self, time=30):
+    def measure(self, time=120):
         return self._measurePM(self.NextPMcmd['Get_PM_60sec'], time)
 
     def measurePM_10_seconds(self, acquisition_time=30):
