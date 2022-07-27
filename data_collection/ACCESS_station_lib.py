@@ -424,6 +424,8 @@ class NEXTPMbeseecher:
                     {res} 
             """)
         return {
+            "type": "nextpm",
+            "sensor": "particulate_matter",
             'PM1count':   int.from_bytes(res[3:5], 'big'),
             'PM2.5count': int.from_bytes(res[5:7], 'big'),
             'PM10count':  int.from_bytes(res[7:9], 'big'),
@@ -516,6 +518,7 @@ class BME280beseecher:
 
         return {
             'type': 'bme280',
+            'sensor': 'air_sensor',
             'humidity': hum,
             'temperature': temp,
             'pressure': prssr
@@ -622,6 +625,7 @@ class MS8607beseecher:
 
         return {
             'type': 'ms8607',
+            'sensor': 'air_sensor',
             'humidity': hum,
             'temperature': temp,
             'pressure': prssr
@@ -633,14 +637,19 @@ class MS8607beseecher:
 class ErrorBeseecher:
 
     # Only stores an error message
-    def __init__(self, msg='Error at boot'):
+    # @param type -> brand of sensor (i.e BME280, NEXTPM, etc)
+    # @param sensor -> what this sensor measures (i.e air_sensor, particulate_matter)
+        # this should reflect the 'sensor' field that would be returned had the 
+        # beseecher initialized successfully
+    def __init__(self, sensor, type, msg='Error at boot'):
         # message to display when exception is raised
         self.message = msg
+        self.type = type
+        self.sensor = sensor
 
     def measure(self): # only here to artificially raise an exception
-        raise(Exception(self.message))
-        return {}
-
+        # return exception as dictionary
+        raise(Exception({'type': self.type, 'sensor': self.sensor, 'error': self.message}))
 #--------------------------------------
 # Sensirion sps30 dust sensor.
 class SPS30beseecher:
@@ -684,7 +693,7 @@ an auto-cleaning interval may also be specified (defaults to 1 day).
                                      
     def measure(self):
         sensor_data = self.sps.get_measurement()['sensor_data']
-        results = {}
+        results = {'type': 'sps30', 'sensor': 'particulate_matter'}
         for k in sensor_data['mass_density'].keys():
             results[self.tr_mass[k]] = sensor_data['mass_density'][k]
         for k in sensor_data['particle_count'].keys():
