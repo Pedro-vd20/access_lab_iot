@@ -244,7 +244,7 @@ class NEXTPMbeseecher:
     pm.measurePM_10_seconds() - measures PM1, PM2.5, PM10 averaging over 10 s
     pm.measurePM_1_minute()   - measures PM1, PM2.5, PM10 averaging over 1 m
     pm.measurePM_15_minutes() - measures PM1, PM2.5, PM10 averaging over 15 m
-    pm.measure() - alias for pm.measurePM_1_minute() 
+    pm.measure() - starts up measurements (using measure_PM_1_minute) but additionally controls ON / OFF depending on humidity 
     pm.get_firmware_version() - returns a hex number in a 4-character string
 
     Note that the measurement methods are blocking, for a time
@@ -295,6 +295,11 @@ class NEXTPMbeseecher:
     #INVALID_ANSW is b'\x16' which shouln'd be returned by any of 
     #the first 4 commands when the sensor is switched on.
     INVALID_ANSW  = 22 
+
+    # information for data_collection and error collection
+    SENSOR = 'particulate_matter'
+    TYPE = 'nextpm'
+    
     def __init__(self,
                  port = '/dev/ttyAMA0',
                  baudrate = 115200,
@@ -424,8 +429,8 @@ class NEXTPMbeseecher:
                     {res} 
             """)
         return {
-            "type": "nextpm",
-            "sensor": "particulate_matter",
+            "type": self.TYPE,
+            "sensor": self.SENSOR,
             'PM1count':   int.from_bytes(res[3:5], 'big'),
             'PM2.5count': int.from_bytes(res[5:7], 'big'),
             'PM10count':  int.from_bytes(res[7:9], 'big'),
@@ -454,7 +459,18 @@ class NEXTPMbeseecher:
                                acquisition_time)
 
     #default measurement method is 1 minute.
-    measure = measurePM_1_minute
+    def measure(self):
+        # turn on in case was off        
+        self.powerON()
+
+        data = self.measurePM_1_minute()
+
+        # check humidity
+        if data['sensor_RH'] < 55.0:
+            self.powerOFF()
+
+        return data
+
         
     def measurePM_15_minutes(self, acquisition_time=1000):
         return self._measurePM(self.NextPMcmd['Get_PM_900sec'],
@@ -473,6 +489,10 @@ class BME280beseecher:
 
     MODES = (0x00, 0x01, 0x03)
     OVERSCANS = (0x00, 0x01, 0x02, 0x03, 0x04, 0x05)
+
+    SENSOR = 'air_sensor'
+    TYPE = 'bme280'
+    
 
     # i2c -> board.I2C() for the raspberry pi
     # mode -> run in sleep (0x00), force (0x01), or normal (0x03) mode, Default
@@ -517,8 +537,8 @@ class BME280beseecher:
         prssr = self.sensor.pressure
 
         return {
-            'type': 'bme280',
-            'sensor': 'air_sensor',
+            'type': self.TYPE,
+            'sensor': self.SENSOR,
             'humidity': hum,
             'temperature': temp,
             'pressure': prssr
@@ -600,6 +620,9 @@ class BME280beseecher:
 # requires the package adafruit-circuitpython-ms8607
 class MS8607beseecher:
 
+    SENSOR = 'air_sensor'
+    TYPE = 'ms8607'
+
     # i2c -> board.I2C() for the raspberry pi
     def __init__(self, 
                  i2c: busio.I2C = None, 
@@ -624,8 +647,8 @@ class MS8607beseecher:
         prssr = self.sensor.pressure
 
         return {
-            'type': 'ms8607',
-            'sensor': 'air_sensor',
+            'type': self.TYPE,
+            'sensor': self.SENSOR,
             'humidity': hum,
             'temperature': temp,
             'pressure': prssr
@@ -649,7 +672,7 @@ class ErrorBeseecher:
 
     def measure(self): # only here to artificially raise an exception
         # return exception as dictionary
-        raise(Exception({'type': self.type, 'sensor': self.sensor, 'error': self.message}))
+        raise(Exception(self.message))
 #--------------------------------------
 # Sensirion sps30 dust sensor.
 class SPS30beseecher:
@@ -679,6 +702,10 @@ an auto-cleaning interval may also be specified (defaults to 1 day).
                 'speed_status': 'Spd_error',
                 'laser_status': 'Las_error',
                 }
+
+    SENSOR = 'particulate_matter'
+    TYPE = 'sps30'
+
     def __init__(self,
                  i2c_bus_number = 1,
                  cleaning_interval_in_days = 1
@@ -693,7 +720,7 @@ an auto-cleaning interval may also be specified (defaults to 1 day).
                                      
     def measure(self):
         sensor_data = self.sps.get_measurement()['sensor_data']
-        results = {'type': 'sps30', 'sensor': 'particulate_matter'}
+        results = {'type': self.TYPE, 'sensor': self.SENSOR}
         for k in sensor_data['mass_density'].keys():
             results[self.tr_mass[k]] = sensor_data['mass_density'][k]
         for k in sensor_data['particle_count'].keys():

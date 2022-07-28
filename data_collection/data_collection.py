@@ -79,61 +79,48 @@ send_diag = False
 
 while True:
     start_measurement_cycle = time.time()
-    data_to_save = {}
-
-    log('Collecting data')
-
-    print('Collecting NEXTPM data')
-    # collect PM data
-    data_to_save['particulate_matter'] = []
-    for i in range(len(pm)):
-        print(i)
-        is_NEXTPM = type(pm[i]) == NEXTPMbeseecher
-        try:
-            if is_NEXTPM:
-                pm[i].powerON()
-            print('collecting data')
-            data = pm[i].measure()
-            print(data)
-            print('checking humidity')
-            if is_NEXTPM and data['sensor_RH'] < 55.0:
-                pm[i].powerOFF()
-            print('saving data')
-            data['sensor'] = 'particulate_matter' + str(i)
-            data_to_save['particulate_matter'].append(data)
-            
-            # check diagnostics on PM
-            print('checking diagnostics')
-            for diag in data['diagnostics'].keys():
-                if data['diagnostics'][diag]:
-                    send_diag = True
-                    write_diag('PM' + str(i), diag)
-            
-        except Exception as e:
-            log('Error collecting info for PM ' + str(i))
-            write_diag('PM' + str(i), str(e)) 
-            send_diag = True
-            #raise(e)
-            
-    # print('Collecting air sensor data')
-    # collect air data
-    data_to_save['air_sensor'] = []
-    for i in range(len(air_sens)):
-        try:
-            data = air_sens[i].measure()
-            data['sensor'] = 'air_sensor' + str(i)
-            data_to_save['air_sensor'].append(data)
-        except Exception as e:
-            log('Error collecting info for air sensor' + str(i))
-            write_diag('air_sensor' + str(i), str(e))
-            send_diag = True
     
-    # print('collecting GPS data')
+    data_to_save = {}
+    sensor_indeces = {} # tracks indeces for each sensor type
+    log('Starting data collection')
+
+    for sensor in sensors:
+        sens = sensor.SENSOR
+
+        # make sure this sensor is already in data_to_save
+        if sens not in data_to_save.keys():
+                data_to_save[sens] = []
+                sensor_indeces[sens] = 0
+
+        index = sensor_indeces[sens]
+        sensor_indeces[sens] += 1
+        
+        try: # in case any sensor fails or is disconnected, the whole system won't crash
+            # collect data from sensor
+            data = sensor.measure()
+            data['sensor'] = sens + str(index) # overwrite sensor info
+
+            # check if there are any diagnostics to report
+            if 'diagnostics' in data.keys():
+                for diag in data['diagnostics'].keys():
+                    if data['diagnostics'][diag]:
+                        send_diag = True
+                        write_diag('PM' + str(i), diag)
+
+            data_to_save[sens].append(data)
+        
+        except Exception as e:
+            log(f'Error collecting info for {sens}{index}, {sensor.TYPE}')
+            write_diag(f'{sens}{index}', str(e))
+            send_diag = True
+            #raise(e) # for testing right now, exception handling later
+
+    log('collecting GPS data')
     # collect GPS data
     try:
         gps_data = gps.fix()
         data_to_save['date_time_position'] = gps_data
-        if(gps_data['latitude'] == None):
+        if(gps_data['latitude'] == None): # GPS has no fix
             raise(Exception('Could not fix GPS'))
     except Exception as e:
         log('Error collecting gps data')
@@ -153,7 +140,7 @@ while True:
     f.close()
 
     # collect diagnostics
-    print('Collecting diagnostics')
+    log('Collecting diagnostics')
     t, u, _ = disk_usage('/')
     memory = u / t
     temp = CPUTemperature().temperature
@@ -179,6 +166,7 @@ while True:
     run('python3 ' + HOME + 'sender.py 10.224.83.51 ' + HOME + 'logs/ 0')
 
     print('sleeping')
+
     elapsed_time = time.time() - start_measurement_cycle
     time.sleep(SamplingInterval - elapsed_time)
 

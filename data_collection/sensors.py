@@ -24,33 +24,49 @@ You should have received a copy of the GNU General Public License along with
 import ACCESS_station_lib as access
 import board
 
+# ---------- #
+# this file should define 2 things
+# sensors: list with ALL the sensors of all types
+#           Any beseecher sensor connected to the station must be appended to
+#           this list
+# gps: unlike the sensors, the gps will be a unique variable with the gps beseecher.
+#
+# When initializing sensors, ALWAYS use a try-except block in case the RPi 
+# fails to start the sensors at boot. The error beseecher class will store any
+# error information that comes up and will allow data-collection to report on 
+# the error.
+
+
 try:
     gps = access.GPSbeseecherGPIO() # only 1 GPS
 except:
-    gps = access.ErrorBeseecher('Error initializing GPS at boot')
+    gps = access.ErrorBeseecher('gps', 'gps', 'Error initializing GPS at boot')
 
-pm = []
+sensors = []
+
+# initialize pm sensors
 ports = ['/dev/ttyAMA0', '/dev/ttyAMA1']
 
 for i in range(2):
     try:
-        pm.append(access.NEXTPMbeseecher(port=ports[i]))
+        sensors.append(access.NEXTPMbeseecher(port=ports[i]))
     except Exception as e:
-        pm.append(access.ErrorBeseecher('particulate_matter', 'nextpm', str(e)))
+        sensors.append(access.ErrorBeseecher('particulate_matter', 'nextpm', str(e)))
 
 i2c = board.I2C()
 
-air_sens = []
-
+# initialize air sensors
+# bme
 try:
-    air_sens.append(access.BME280beseecher(i2c=i2c))
+    sensors.append(access.BME280beseecher(i2c=i2c))
 except Exception as e:
-    error_msg = str(e) + ' (bme280)'
-    air_sens.append(access.ErrorBeseecher('air_sensor', 'bme280', error_msg))
+    error_msg = str(e)
+    sensors.append(access.ErrorBeseecher('air_sensor', 'bme280', error_msg))
+# ms8607
 try:
-    air_sens.append(access.MS8607beseecher(i2c=i2c))
+    sensors.append(access.MS8607beseecher(i2c=i2c))
 except Exception as e:
-    error_msg = str(e) + ' (ms8607)'
-    air_sens.append(access.ErrorBeseecher('air_sensor', 'ms8607', error_msg))
+    error_msg = str(e)
+    sensors.append(access.ErrorBeseecher('air_sensor', 'ms8607', error_msg))
 
 
