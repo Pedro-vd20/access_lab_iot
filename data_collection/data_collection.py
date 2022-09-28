@@ -38,9 +38,15 @@ MAX_SAMPLES = 1
 
 #------------------------------------------------
 
+##
+# writes an occured error into the diagnostics file located at /home/pi/
+# @param error_name: error type (air sensor, cpu temperature, exception...)
+# @param error: string info describing error
+# appends errors to file until diagnostics sends them
 def write_diag(error_name, error):
-    f = open(HOME + 'station' + station_num + '_diagnostics.txt', 'a')
+    f = open(f'{HOME}station{station_num}_diagnostics.txt', 'a+')
     
+    # timestamp data
     now = datetime.datetime.now()
     f.write(now.strftime('%Y-%m-%d %H:%M:%S'))
     f.write('\n')
@@ -57,9 +63,13 @@ def write_diag(error_name, error):
     f.write('\n\n')
     f.close()
 
+##
+# writes the cpu temperature and disk space in use into the diagnostic file
+# the file is located in /home/pi/
 def write_temp_mem(temp, mem):
-    f = open(HOME + 'station' + station_num + '_diagnostics.txt', 'a')
+    f = open(f'{HOME}station{station_num}_diagnostics.txt', 'a+')
     
+    # timestamp data
     now = datetime.datetime.now()
     f.write(now.strftime('%Y-%m-%d %H:%M:%S'))
     f.write('\n')
@@ -78,12 +88,14 @@ nerror = 0
 send_diag = False
 
 while True:
+    # collect start time
     start_measurement_cycle = time.time()
     
     data_to_save = {}
     sensor_indeces = {} # tracks indeces for each sensor type
     log('Starting data collection')
 
+    # data collection loop
     for sensor in sensors:
         sens = sensor.SENSOR
 
@@ -115,8 +127,8 @@ while True:
             send_diag = True
             #raise(e) # for testing right now, exception handling later
 
-    log('collecting GPS data')
     # collect GPS data
+    log('collecting GPS data')
     try:
         gps_data = gps.fix()
         data_to_save['date_time_position'] = gps_data
@@ -127,6 +139,8 @@ while True:
         write_diag('gps', str(e))
         send_diag = True
 
+
+    # collect date and time for naming files
     curr_time = gps_data['time']
     curr_date = gps_data['date']
     
@@ -143,6 +157,7 @@ while True:
     log('Collecting diagnostics')
     t, u, _ = disk_usage('/')
     memory = u / t
+
     temp = CPUTemperature().temperature
     if(temp > 70 or memory > 0.8):
         send_diag = True
@@ -161,10 +176,9 @@ while True:
     f_name = secure_filename('station' + station_num + '_' + curr_date + 'T' + curr_time + 'Z.json')
     with open(HOME + 'logs/' + f_name, 'w') as f:
         json.dump(data_to_save, f, indent=4)
-    
-    # send
-    run('python3 ' + HOME + 'sender.py 10.224.83.51 ' + HOME + 'logs/ 0')
 
+    # call sender to manage sending of file
+    run(f'python3 {HOME}sender.py 10.224.83.51 {HOME}logs/ 0')
     print('sleeping')
 
     elapsed_time = time.time() - start_measurement_cycle
