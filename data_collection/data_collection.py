@@ -182,7 +182,7 @@ while True:
     print('sleeping')
 
     elapsed_time = time.time() - start_measurement_cycle
-    time.sleep(SamplingInterval - elapsed_time)
+    time.sleep(max(0, SamplingInterval - elapsed_time)) # protect from possible case where sensor stalls past 10 minutes
 
     
     
