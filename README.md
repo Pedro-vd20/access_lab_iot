@@ -404,3 +404,96 @@ Sending data:
 * `Authentication failed`: server was unable to verify Pi's identity, sender stops running
 * `file_name could not be sent`: error verifying checksum of sent file. Sender will simply keep that file in the logs folder rather than moving it to the directory of sent files. The script will continue to run, sending other files. This unsent file will be sent the next time the script runs.
 
+## The ACCESS Station library
+
+This library includes all the beseecher classes used to communicate with the various sensors. If adding new classes, be sure they all contain a .measure() method, which will return a JSON dictionary of the values measured as well as two additional key-value pairs: 
+
+```JSON
+"type": <brand>,
+"sensor": <data_being_measured> 
+```
+
+Type will differentiate sensors that collect the same data but from different brands, while sensor describes the data being measured. This allows `data_collection.py` to treat all sensors as the same, and through these 2 fields separate the data into appropriate fields. Of these 2 keys, `type` is purely for the user and serves no purpose in the code, and thus is not strictly necessary, though highly recommended. `sensor` though is necessary. Additionally, each beseecher class needs variables containing the `type` and `sensor` information. This is in case an error occurs when interrogating sensors. Having these two class variables will allow the error handling to recover important diagnostic information.
+
+The exception to the rule is GPS. The code assumes each station has exactly 1 GPS sensor and the code treats it different to other sensors. It lacks the `type` and `sensor` keys and its data is collected separately from the other sensors in the data_collection loop.
+
+### Sample Data
+
+```json
+{
+    "particulate_matter": [
+        {
+            "PM1count": 174,
+            "PM2.5count": 175,
+            "PM10count": 176,
+            "PM1mass": 12.8,
+            "PM2.5mass": 20.8,
+            "PM10mass": 40.4,
+            "sensor_T": 36.15,
+            "sensor_RH": 66.22,
+            "diagnostics": {
+                "Degraded": false,
+                "Notready": false,
+                "Eccess_RH": false,
+                "T_RH_off": false,
+                "Fan_error": false,
+                "Mem_error": false,
+                "Las_error": false
+            },
+            "sensor": "particulate_matter0",
+            "type": "nextpm"
+        },
+        {
+            "PM1count": 176,
+            "PM2.5count": 178,
+            "PM10count": 178,
+            "PM1mass": 12.6,
+            "PM2.5mass": 20.6,
+            "PM10mass": 43.7,
+            "sensor_T": 36.0,
+            "sensor_RH": 66.01,
+            "diagnostics": {
+                "Degraded": false,
+                "Notready": false,
+                "Eccess_RH": false,
+                "T_RH_off": false,
+                "Fan_error": false,
+                "Mem_error": false,
+                "Las_error": false
+            },
+            "sensor": "particulate_matter1",
+            "type": "nextpm"
+        }
+    ],
+    "air_sensor": [
+        {
+            "type": "bme280",
+            "humidity": 63.82468880562936,
+            "temperature": 35.023828125,
+            "pressure": 994.0989164570198,
+            "sensor": "air_sensor0"
+        },
+        {
+            "type": "ms8607",
+            "humidity": 64.14846801757812,
+            "temperature": 35.04,
+            "pressure": 993.72,
+            "sensor": "air_sensor1"
+        }
+    ],
+    "date_time_position": {
+        "date": "2022-07-21",
+        "time": "16:50:12",
+        "latitude": 24.524989,
+        "lat_dir": "N",
+        "longitude": 54.43276483333333,
+        "lon_dir": "E",
+        "altitude": -30.9,
+        "alt_unit": "M",
+        "num_sats": 6,
+        "PDOP": 2.99,
+        "HDOP": 1.65,
+        "VDOP": 2.5
+    }
+}
+```

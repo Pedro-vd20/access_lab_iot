@@ -44,43 +44,32 @@ MAX_SAMPLES = 1
 # @param error: string info describing error
 # appends errors to file until diagnostics sends them
 def write_diag(error_name, error):
-    f = open(f'{HOME}station{station_num}_diagnostics.txt', 'a+')
-    
-    # timestamp data
-    now = datetime.datetime.now()
-    f.write(now.strftime('%Y-%m-%d %H:%M:%S'))
-    f.write('\n')
+    with open(f'{HOME}station{station_num}_diagnostics.txt', 'a') as f:
+        # timestamp data
+        now = datetime.datetime.now()
+        f.write(f'{now.strftime("%Y-%m-%d %H:%M:%S")}\n')
 
-    # clean up error
-    error = error.replace('\n', ' ')
-    error = error.replace('\r', '')
-    error = error.replace('\t', ' ')
-    while '  ' in error:
-        error = error.replace('  ', ' ')
+        # clean up error
+        error = error.replace('\n', ' ')
+        error = error.replace('\r', '')
+        error = error.replace('\t', ' ')
+        while '  ' in error:
+            error = error.replace('  ', ' ')
 
-    f.write(str(error_name) + '\n')
-    f.write(str(error))
-    f.write('\n\n')
-    f.close()
+        f.write(f'{str(error_name)}\n{str(error)}\n\n')
 
 ##
 # writes the cpu temperature and disk space in use into the diagnostic file
 # the file is located in /home/pi/
 def write_temp_mem(temp, mem):
-    f = open(f'{HOME}station{station_num}_diagnostics.txt', 'a+')
-    
-    # timestamp data
-    now = datetime.datetime.now()
-    f.write(now.strftime('%Y-%m-%d %H:%M:%S'))
-    f.write('\n')
+    with open(f'{HOME}station{station_num}_diagnostics.txt', 'a') as f:
+        # timestamp data
+        now = datetime.datetime.now()
+        f.write(f'{now.strftime("%Y-%m-%d %H:%M:%S")}\n')
 
-    # write error info
-    f.write('cpu\n')
-    f.write(str(temp))
-    f.write('\nmemory\n')
-    f.write(str(mem))
-    f.write('\n\n')
-    f.close()
+        # write error info
+        f.write(f'cpu\n{temp}\nmemory\n{mem}\n\n')
+
 
 #-----------------------------------------------
 nerror = 0
@@ -117,7 +106,7 @@ while True:
                 for diag in data['diagnostics'].keys():
                     if data['diagnostics'][diag]:
                         send_diag = True
-                        write_diag('PM' + str(i), diag)
+                        write_diag(f'PM{i}', diag)
 
             data_to_save[sens].append(data)
         
@@ -144,14 +133,9 @@ while True:
     curr_time = gps_data['time']
     curr_date = gps_data['date']
     
-    # save date-time for diag to use
-    try:
-        f = open(HOME + 'time.txt', 'w')
-    except:
-        f = open(HOME + 'time.txt', 'a')
-
-    f.write(curr_time + '\n' + curr_date)
-    f.close()
+    with open(f'{HOME}time.txt', 'w+') as f:
+        f.write(f'{curr_time}\n{curr_date}')
+    
 
     # collect diagnostics
     log('Collecting diagnostics')
@@ -173,8 +157,8 @@ while True:
         run('sudo systemctl restart diagnostics')
 
     # file name
-    f_name = secure_filename('station' + station_num + '_' + curr_date + 'T' + curr_time + 'Z.json')
-    with open(HOME + 'logs/' + f_name, 'w') as f:
+    f_name = secure_filename(f'station{station_num}_{curr_date}T{curr_time}Z.json')
+    with open(f'{HOME}logs/{f_name}', 'w+') as f:
         json.dump(data_to_save, f, indent=4)
 
     # call sender to manage sending of file
