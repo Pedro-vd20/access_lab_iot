@@ -49,24 +49,24 @@ ports = ['/dev/ttyAMA0', '/dev/ttyAMA1']
 
 for i in range(2):
     try:
-        sensors.append(access.NEXTPMbeseecher(port=ports[i]))
+        sensors.append(access.NEXTPMbeseecher(port=ports[i], index=i))
     except Exception as e:
-        sensors.append(access.ErrorBeseecher('particulate_matter', 'nextpm', str(e)))
+        sensors.append(access.ErrorBeseecher('particulate_matter', 'nextpm', str(e), index=i))
 
 i2c = board.I2C()
 
 # initialize air sensors
 # bme
 try:
-    sensors.append(access.BME280beseecher(i2c=i2c))
+    sensors.append(access.BME280beseecher(i2c=i2c, index=0))
 except Exception as e:
     error_msg = str(e)
-    sensors.append(access.ErrorBeseecher('air_sensor', 'bme280', error_msg))
+    sensors.append(access.ErrorBeseecher('air_sensor', 'bme280', error_msg, index=0))
 # ms8607
 try:
-    sensors.append(access.MS8607beseecher(i2c=i2c))
+    sensors.append(access.MS8607beseecher(i2c=i2c, index=1))
 except Exception as e:
     error_msg = str(e)
-    sensors.append(access.ErrorBeseecher('air_sensor', 'ms8607', error_msg))
+    sensors.append(access.ErrorBeseecher('air_sensor', 'ms8607', error_msg, index=1))
 
 

@@ -117,7 +117,7 @@ def data_init():
         # if data_to_save already has a list for this sensor type, add slot 
         #   for new sensor
         if data_to_save.get(sensor, []):
-            data_to_save.append(None)
+            data_to_save[sensor].append(None)
         else:
             # new list for first sensor of this type
             data_to_save[sensor] = [None]
