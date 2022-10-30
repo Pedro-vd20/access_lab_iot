@@ -21,6 +21,7 @@ You should have received a copy of the GNU General Public License along with
 
 '''
 
+from concurrent.futures import thread
 import time
 import datetime
 import json
@@ -32,11 +33,22 @@ from gpiozero import CPUTemperature
 from station_id import *
 from modules import *
 from werkzeug.utils import secure_filename
+import threading
 
-SamplingInterval = 600 #in seconds
+#------------------------------------------------
+# Constants
+
+SAMPLING_INTERVAL = 600 #in seconds
 MAX_SAMPLES = 1
 
 #------------------------------------------------
+# Global variables
+data_to_save = {}
+lock = threading.Lock()
+threads = [None] * len(sensors)
+
+#-----------------------------------------------
+# functions 
 
 ##
 # writes an occured error into the diagnostics file located at /home/pi/
@@ -71,103 +83,124 @@ def write_temp_mem(temp, mem):
         f.write(f'cpu\n{temp}\nmemory\n{mem}\n\n')
 
 
-#-----------------------------------------------
-nerror = 0
+def measure(sensor, sensor_type, index):
+    try: # in case any sensor fails or is disconnected, the whole system won't crash
+        # collect data from sensor
+        data = sensor.measure()
+        data['sensor'] = sensor_type + str(index) # overwrite sensor info
 
-send_diag = False
-
-while True:
-    # collect start time
-    start_measurement_cycle = time.time()
+        # check if there are any diagnostics to report
+        if 'diagnostics' in data.keys():
+            for diag in data['diagnostics'].keys():
+                if data['diagnostics'][diag]:
+                    write_diag(f'PM{i}', diag)
+        
+        global lock, data_to_save
+        lock.acquire()
+        data_to_save[sensor_type][index] = data
+        lock.release()
     
-    data_to_save = {}
-    sensor_indeces = {} # tracks indeces for each sensor type
-    log('Starting data collection')
-
-    # data collection loop
-    for sensor in sensors:
-        sens = sensor.SENSOR
-
-        # make sure this sensor is already in data_to_save
-        if sens not in data_to_save.keys():
-                data_to_save[sens] = []
-                sensor_indeces[sens] = 0
-
-        index = sensor_indeces[sens]
-        sensor_indeces[sens] += 1
-        
-        try: # in case any sensor fails or is disconnected, the whole system won't crash
-            # collect data from sensor
-            data = sensor.measure()
-            data['sensor'] = sens + str(index) # overwrite sensor info
-
-            # check if there are any diagnostics to report
-            if 'diagnostics' in data.keys():
-                for diag in data['diagnostics'].keys():
-                    if data['diagnostics'][diag]:
-                        send_diag = True
-                        write_diag(f'PM{i}', diag)
-
-            data_to_save[sens].append(data)
-        
-        except Exception as e:
-            log(f'Error collecting info for {sens}{index}, {sensor.TYPE}')
-            write_diag(f'{sens}{index}', str(e))
-            send_diag = True
-            #raise(e) # for testing right now, exception handling later
-
-    # collect GPS data
-    log('collecting GPS data')
-    try:
-        gps_data = gps.fix()
-        data_to_save['date_time_position'] = gps_data
-        if(gps_data['latitude'] == None): # GPS has no fix
-            raise(Exception('Could not fix GPS'))
     except Exception as e:
-        log('Error collecting gps data')
-        write_diag('gps', str(e))
-        send_diag = True
+        log(f'Error collecting info for {sensor_type}{index}, {sensor.TYPE}')
+        write_diag(f'{sensor_type}{index}', str(e))
+        #raise(e) # for testing right now, exception handling later
+
+# counts all the sensors connected to the RPi
+# creates appropriate list length in data_to_save to allow threads to take charge
+def data_init():
+    global data_to_save
+
+    for sensor in sensors:
+        # get sensor type
+        sensor = sensor.SENSOR
+        
+        # if data_to_save already has a list for this sensor type, add slot 
+        #   for new sensor
+        if data_to_save.get(sensor, []):
+            data_to_save.append(None)
+        else:
+            # new list for first sensor of this type
+            data_to_save[sensor] = [None]
 
 
-    # collect date and time for naming files
-    curr_time = gps_data['time']
-    curr_date = gps_data['date']
-    
-    with open(f'{HOME}time.txt', 'w+') as f:
-        f.write(f'{curr_time}\n{curr_date}')
-    
 
-    # collect diagnostics
-    log('Collecting diagnostics')
-    t, u, _ = disk_usage('/')
-    memory = u / t
+#-----------------------------------------------
 
-    temp = CPUTemperature().temperature
-    if(temp > 70 or memory > 0.8):
-        send_diag = True
-        if temp > 70:
-            write_diag('temp', str(temp))
-        if memory > 0.8:
-            write_diag('disk_space', str(memory))
-    write_temp_mem(str(temp), str(memory))
+def main():
+    while True:
+        # collect start time
+        start_measurement_cycle = time.time()
+        
+        global data_to_save
+        data_to_save = {} # reset data to save in case it holds data from prev
+        log('Starting data collection')
 
-    # check to send diagnostics
-    if send_diag:
-        send_diag = False
-        run('sudo systemctl restart diagnostics')
+        # count how many of each sensor
+        # initialize all lists within data_to_save
+        data_init()
+        
+        # set up data_to_save for data collection
+        global threads
+        for i, sensor in enumerate(sensors):
+            threads[i] = threading.Thread(target=measure, args=(sensor, \
+                sensor.SENSOR, sensor.INDEX))
 
-    # file name
-    f_name = secure_filename(f'station{station_num}_{curr_date}T{curr_time}Z.json')
-    with open(f'{HOME}logs/{f_name}', 'w+') as f:
-        json.dump(data_to_save, f, indent=4)
+            threads[i].start()
 
-    # call sender to manage sending of file
-    run(f'python3 {HOME}sender.py 10.224.83.51 {HOME}logs/ 0')
-    print('sleeping')
+        # collect GPS data
+        log('collecting GPS data')
+        try:
+            gps_data = gps.fix()
+            lock.acquire()
+            data_to_save['date_time_position'] = gps_data
+            lock.release()
+            if(gps_data['latitude'] == None): # GPS has no fix
+                raise(Exception('Could not fix GPS'))
+        except Exception as e:
+            log('Error collecting gps data')
+            write_diag('gps', str(e))
 
-    elapsed_time = time.time() - start_measurement_cycle
-    time.sleep(max(0, SamplingInterval - elapsed_time)) # protect from possible case where sensor stalls past 10 minutes
+        # collect date and time for naming files
+        curr_time = gps_data['time']
+        curr_date = gps_data['date']
+        
+        with open(f'{HOME}time.txt', 'w+') as f:
+            f.write(f'{curr_time}\n{curr_date}')
+        
+        # collect diagnostics
+        log('Collecting diagnostics')
+        t, u, _ = disk_usage('/')
+        memory = u / t
 
+        temp = CPUTemperature().temperature
+        if(temp > 70 or memory > 0.8):
+            if temp > 70:
+                write_diag('temp', str(temp))
+            if memory > 0.8:
+                write_diag('disk_space', str(memory))
+        write_temp_mem(str(temp), str(memory))
+
+        # join threads
+        for thread in threads:
+            thread.join()        
+
+        # file name
+        f_name = secure_filename(f'station{station_num}_{curr_date}T{curr_time}Z.json')
+        with open(f'{HOME}logs/{f_name}', 'w+') as f:
+            json.dump(data_to_save, f, indent=4)
+
+        # call sender to manage sending of file
+        run(f'python3 {HOME}sender.py 10.224.83.51 {HOME}logs/ 0')
+        print('sleeping')
+
+        elapsed_time = time.time() - start_measurement_cycle
+        time.sleep(max(0, SAMPLING_INTERVAL - elapsed_time)) # protect from possible case where sensor stalls past 10 minutes
+
+    return 0 # should never run
+
+
+if __name__ == '__main__':
+    main()
     
     
     '''

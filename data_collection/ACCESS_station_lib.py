@@ -306,8 +306,10 @@ class NEXTPMbeseecher:
                  parity = serial.PARITY_EVEN,
                  stopbits = serial.STOPBITS_ONE,
                  bytesize = serial.EIGHTBITS,
-                 timeout = 1.0
+                 timeout = 1.0,
+                 index=0
                  ):
+        self.INDEX = index
         self.port = port
         self.serialprms = {
             'port':     port,
@@ -503,9 +505,12 @@ class BME280beseecher:
     def __init__(self, 
                  i2c: busio.I2C = None, 
                  mode: int = 0x01, 
-                 overscan: int = 0x05
+                 overscan: int = 0x05,
+                 index = 0
                 ):
         
+        self.INDEX = index
+
         if i2c == None:
             i2c = board.I2C()
 
@@ -626,7 +631,10 @@ class MS8607beseecher:
     # i2c -> board.I2C() for the raspberry pi
     def __init__(self, 
                  i2c: busio.I2C = None, 
+                 index = 0
                 ):
+
+        self.INDEX = index
         
         if i2c == None:
             i2c = board.I2C()
@@ -664,8 +672,9 @@ class ErrorBeseecher:
     # @param sensor -> what this sensor measures (i.e air_sensor, particulate_matter)
         # this should reflect the 'sensor' field that would be returned had the 
         # beseecher initialized successfully
-    def __init__(self, sensor, type, msg='Error at boot'):
+    def __init__(self, sensor, type, msg='Error at boot', index = 0):
         # message to display when exception is raised
+        self.INDEX = 0
         self.message = msg
         self.type = type
         self.sensor = sensor
@@ -708,8 +717,12 @@ an auto-cleaning interval may also be specified (defaults to 1 day).
 
     def __init__(self,
                  i2c_bus_number = 1,
-                 cleaning_interval_in_days = 1
+                 cleaning_interval_in_days = 1,
+                 index = 0
                  ):
+
+        self.INDEX = index
+
         # The following raises a 'FileNotFoundError' exception if
         # the specified i2c bus does not exists.
         self.sps = SPS30(bus = i2c_bus_number)
