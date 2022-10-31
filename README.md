@@ -191,6 +191,7 @@ Python dependencies
 * pynmea
 * adafruit_bme280
 * adafruit_ms8607
+* threading
 
 Other dependencies
 * hostapd 2:2.9.0-21
@@ -352,6 +353,8 @@ This guide will follow the steps from boot up to operation required to set up th
     1. The air sensors (temperature, humidity, and pressure) are connected to the I2C pins, `GPIO 2` and `GPIO 3`. Both are connected throught the bret board, as the Waveshare BME280 can be configured to use address `0x77` while the MS 8607 uses `0x76`.
     
     Modify `sensors.py` to properly initialize each sensor, depending on how they where plugged in.
+    
+    `sensors.py` will then loop through the sensors created and assign an index to each. This is necessary for data_collection later and is done automatically.
 
 1. Run `test.py` to do a quick test of all the hardware. If the RPi reboots, the hardware testing was successful. It may take some time while sensors such as the GPS calibrate.
 
