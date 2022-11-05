@@ -49,24 +49,34 @@ ports = ['/dev/ttyAMA0', '/dev/ttyAMA1']
 
 for i in range(2):
     try:
-        sensors.append(access.NEXTPMbeseecher(port=ports[i], index=i))
+        sensors.append(access.NEXTPMbeseecher(port=ports[i]))
     except Exception as e:
-        sensors.append(access.ErrorBeseecher('particulate_matter', 'nextpm', str(e), index=i))
+        sensors.append(access.ErrorBeseecher('particulate_matter', 'nextpm', str(e)))
 
 i2c = board.I2C()
 
 # initialize air sensors
 # bme
 try:
-    sensors.append(access.BME280beseecher(i2c=i2c, index=0))
+    sensors.append(access.BME280beseecher(i2c=i2c))
 except Exception as e:
     error_msg = str(e)
-    sensors.append(access.ErrorBeseecher('air_sensor', 'bme280', error_msg, index=0))
+    sensors.append(access.ErrorBeseecher('air_sensor', 'bme280', error_msg))
 # ms8607
 try:
-    sensors.append(access.MS8607beseecher(i2c=i2c, index=1))
+    sensors.append(access.MS8607beseecher(i2c=i2c))
 except Exception as e:
     error_msg = str(e)
-    sensors.append(access.ErrorBeseecher('air_sensor', 'ms8607', error_msg, index=1))
+    sensors.append(access.ErrorBeseecher('air_sensor', 'ms8607', error_msg))
 
 
+# set up indeces for all sensors 
+# DO NOT MODIFY THIS PART, ONLY MODIFY SENSOR DECLARATIONS ABOVE
+# these index set up is necessary for multithreading
+# we don't know which thread will finish first, these indeces will make sure
+#   the order of sensors is kept (we want the data collected by sensor i to 
+#   always be the ith index in the data file)
+indeces = {}
+for sensor in sensors:
+    indeces[sensor.SENSOR] = indeces.get(sensor.SENSOR, -1) + 1
+    sensor.index = indeces[sensor.SENSOR]
