@@ -143,7 +143,7 @@ def main():
         global threads
         for i, sensor in enumerate(sensors):
             threads[i] = threading.Thread(target=measure, args=(sensor, \
-                sensor.SENSOR, sensor.INDEX))
+                sensor.SENSOR, sensor.index))
 
             threads[i].start()
 

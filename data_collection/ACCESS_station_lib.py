@@ -309,7 +309,7 @@ class NEXTPMbeseecher:
                  timeout = 1.0,
                  index=0
                  ):
-        self.INDEX = index
+        self.index = index
         self.port = port
         self.serialprms = {
             'port':     port,
@@ -509,7 +509,7 @@ class BME280beseecher:
                  index = 0
                 ):
         
-        self.INDEX = index
+        self.index = index
 
         if i2c == None:
             i2c = board.I2C()
@@ -634,7 +634,7 @@ class MS8607beseecher:
                  index = 0
                 ):
 
-        self.INDEX = index
+        self.index = index
         
         if i2c == None:
             i2c = board.I2C()
@@ -674,10 +674,10 @@ class ErrorBeseecher:
         # beseecher initialized successfully
     def __init__(self, sensor, type, msg='Error at boot', index = 0):
         # message to display when exception is raised
-        self.INDEX = 0
+        self.index = 0
         self.message = msg
-        self.type = type
-        self.sensor = sensor
+        self.TYPE = type
+        self.SENSOR = sensor
 
     def measure(self): # only here to artificially raise an exception
         # return exception as dictionary
@@ -721,7 +721,7 @@ an auto-cleaning interval may also be specified (defaults to 1 day).
                  index = 0
                  ):
 
-        self.INDEX = index
+        self.index = index
 
         # The following raises a 'FileNotFoundError' exception if
         # the specified i2c bus does not exists.
