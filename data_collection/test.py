@@ -31,17 +31,12 @@ from modules import log
 # if it crashes at any point, it will log failure and let the user know
 def main():
     try:
-        print('Testing Particle Measure Sensors')
-        for i in range(len(pm)):
+        print('Testing Sensors')
+        for i in range(len(sensors)):
             print('Testing', i)
-            print('Is on:', pm[i].is_ON())
+            print(sensors[i].measure())
         print()
 
-        print('Testing Air Sensors')
-        for i in range(len(air_sens)):
-            print('Testing', i)
-            print(air_sens[i].measure())
-        print()
 
         print('Testing GPS')
         print(gps.fix())
