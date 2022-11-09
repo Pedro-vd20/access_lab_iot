@@ -113,7 +113,7 @@ while True:
     curr_date = f.readline().strip()
 
     f_name = secure_filename('station' + station_num + '_' + curr_date + 'T' + curr_time + 'Z_diagnostics.json')
-    with open(HOME + 'logs/' + f_name, 'w') as f:
+    with open(HOME + 'data_logs/' + f_name, 'w') as f:
         json.dump(diagnostics, f, indent=4)
     
     f = open(diag_file, 'w')
