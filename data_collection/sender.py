@@ -61,7 +61,7 @@ except:
 '''
 
 # URL = 'http://10.224.83.51:5000'
-# FOLDER = '/home/pi/logs/'
+# FOLDER = '/home/pi/data_logs/'
 # DEST_FOLDER = '/home/pi/sent_files/'
 
 def main(args):

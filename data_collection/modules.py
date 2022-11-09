@@ -24,30 +24,34 @@ You should have received a copy of the GNU General Public License along with
 import os
 import datetime
 
-# shared code for multiple files
+#---------
 
-##########
-# Constants
-##########
+''' 
+shared code for multiple files
+'''
+
+#----------
 
 HOME = '/home/pi/'
 
-##########
-# Code
-##########
+#----------
 
 # makes running console commands easier
-def run(arg):
-    os.system(arg)
+def run(comm):
+    os.system(comm)
 
+'''
+Log information for later debugging
+Collects timestamp of log 
+'''
 def log(msg):
-    
-    f = open(HOME + 'logs.txt', 'a')
-
     # get current time
-    now = datetime.datetime.now()
-    f.write(now.strftime('[%Y-%m-%d %H:%M:%S] '))
-    f.write(msg + '\n')
-    f.close()
+    now = datetime.datetime.now() 
+    year = now.year
+    month = now.month
+
+    with open(f'{HOME}logs/{year}_{month}_logs.txt', 'a') as f:
+        f.write(now.strftime('[%Y-%m-%d %H:%M:%S] '))
+        f.write(msg + '\n')
 
     
