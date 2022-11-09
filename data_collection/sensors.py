@@ -80,3 +80,4 @@ indeces = {}
 for sensor in sensors:
     indeces[sensor.SENSOR] = indeces.get(sensor.SENSOR, -1) + 1
     sensor.index = indeces[sensor.SENSOR]
+
