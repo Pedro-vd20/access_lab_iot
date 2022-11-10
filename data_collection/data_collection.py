@@ -31,7 +31,7 @@ from sensors import *
 from shutil import disk_usage
 from gpiozero import CPUTemperature
 from station_id import *
-from modules import *
+from packages.modules import *
 from werkzeug.utils import secure_filename
 import threading
 
@@ -186,11 +186,11 @@ def main():
 
         # file name
         f_name = secure_filename(f'station{station_num}_{curr_date}T{curr_time}Z.json')
-        with open(f'{HOME}logs/{f_name}', 'w+') as f:
+        with open(f'{HOME}data_logs/{f_name}', 'w') as f:
             json.dump(data_to_save, f, indent=4)
 
         # call sender to manage sending of file
-        run(f'python3 {HOME}sender.py 10.224.83.51 {HOME}logs/ 0')
+        run(f'python3 {HOME}sender.py 10.224.83.51 {HOME}data_logs/ 0')
         print('sleeping')
 
         elapsed_time = time.time() - start_measurement_cycle

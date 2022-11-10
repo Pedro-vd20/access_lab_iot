@@ -25,11 +25,11 @@ import requests as rqs
 import sys
 import os
 import hashlib
-from modules import *
+from packages.modules import *
 
 try:
     from station_id import *
-except:
+except ModuleNotFoundError:
     print('PI id not found')
     exit(-1)
 

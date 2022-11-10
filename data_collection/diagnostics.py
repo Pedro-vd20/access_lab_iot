@@ -24,100 +24,121 @@ You should have received a copy of the GNU General Public License along with
 import time
 import datetime
 import json
+import os
 import sys
 from shutil import disk_usage
 from gpiozero import CPUTemperature
 from station_id import *
 from werkzeug.utils import secure_filename
-from modules import *
+from packages.modules import *
 
-SamplingInterval = 86400 #in seconds
-MAX_SAMPLES = 1
+#----------
 
-#------------------------------------------------
+'''
+Collect status information on the RPi every 24 hours
+Collects disk space and cpu temperature
+'''
 
-nerror = 0
+#---------- 
 
+SAMPLING_INTERVAL = 86400 #in seconds
+
+#----------
+
+# sleep some time to let data_collection begin
 time.sleep(20)
 
-while True:
-    start_measurement_cycle = time.time()
+def main():
+    diag_file = f'{HOME}station{station_num}_diagnostics.txt'
+    time_file = f'{HOME}time.txt'
 
-    diag_file = HOME + 'station' + station_num + '_diagnostics.txt'
+    while True:
+        start_measurement_cycle = time.time()
 
-    try:
-        f = open(diag_file, 'r')
-    except:
-        log('No diagnostics to send')
-        time.sleep(600)
-        continue
+        # check if diag file exists (regularly filled by data_collection.py)
+        if not (os.path.isfile(diag_file) and os.path.isfile(time_file)):
+            log('No diagnostics to send')
+            time.sleep(600)
+            continue
 
-    # read groups of lines
-    lines = []
-    temp = []
-    for line in f:
-        line = line.strip()
-        if line == '' and len(temp) != 0:
-            lines.append(temp)
+        # read time
+        # data_collection uses accurate, timestamps from GPS
+        # stores these in time_f for us to use
+        with open(time_file, 'r') as time_f:
+            curr_time = time_f.readline().strip()
+            curr_date = time_f.readline().strip()
+
+        # read the contents of diag_file to send and format
+        with open(diag_file, 'r') as in_f:
+            # read groups of lines
+            lines = []
             temp = []
-        elif line != 0:
-            temp.append(line.strip())
-    f.close()
 
-    if len(lines) == 0:
-        log('No diagnotics to send')
-        time.sleep(600)
-        continue
+            for line in in_f:
+                line = line.strip()
+                
+                # current group of data is finished, add it to lines
+                if line == '' and len(temp) != 0:
+                    lines.append(temp)
+                    temp = []
+                # current line is part of bigger group, append to temp
+                elif line != 0:
+                    temp.append(line.strip())
+        
+        # Check again if file is empty, sleep for data_collection to fill diagnostics
+        if len(lines) == 0:
+            log('No diagnotics to send')
+            time.sleep(600)
+            continue
 
-    diagnostics = {
-        'id': secret,
-        'cpu_temp': [],
-        'disk_space': [],
-        'time': [],
-        'date': [],
-        'errors': {
-            
-        }
-    }
-
-    # process each line group
-    for group in lines:
-        is_empty = False
-        if len(group) == 3: # group is an error    
-            time_date = group[0].strip().split(' ')
-            error_name = group[1].strip()
-            error = group[2].strip()
-
-            diagnostics['errors'][error_name] = {
-                'time': time_date[1],
-                'date': time_date[0],
-                'error': error
+        # data structure to fill in and send to server
+        diagnostics = {
+            'id': secret,
+            'cpu_temp': [],
+            'disk_space': [],
+            'time': [],
+            'date': [],
+            'errors': {
+                
             }
-        elif len(group) == 5: # group is a memory/cpu data
-            time_date = group[0].strip().split(' ')
-            cpu = group[2].strip()
-            mem = group[4].strip()
+        }
 
-            diagnostics['cpu_temp'].append(cpu)
-            diagnostics['disk_space'].append(mem)
-            diagnostics['time'].append(time_date[1])
-            diagnostics['date'].append(time_date[0])
+        # process each line group
+        for group in lines:
 
-    # get time
-    try:
-        f = open(HOME + 'time.txt', 'r')
-    except:
-        time.sleep(600) # wait for first round of data collection
-        continue
-    curr_time = f.readline().strip()
-    curr_date = f.readline().strip()
+            # THIS FIRST OPTION IN THE IF IS CURRENTLY DISABLED, NEVER WILL RUN
+            if len(group) == 3: # group is an error    
+                time_date = group[0].strip().split(' ')
+                error_name = group[1].strip()
+                error = group[2].strip()
 
-    f_name = secure_filename('station' + station_num + '_' + curr_date + 'T' + curr_time + 'Z_diagnostics.json')
-    with open(HOME + 'data_logs/' + f_name, 'w') as f:
-        json.dump(diagnostics, f, indent=4)
-    
-    f = open(diag_file, 'w')
-    f.close()
+                diagnostics['errors'][error_name] = {
+                    'time': time_date[1],
+                    'date': time_date[0],
+                    'error': error
+                }
+            elif len(group) == 5: # group is a disk/cpu data
+                time_date = group[0].strip().split(' ')
+                cpu = group[2].strip()
+                disk = group[4].strip()
 
-    elapsed = time.time() - start_measurement_cycle
-    time.sleep(SamplingInterval - elapsed)
+                diagnostics['cpu_temp'].append(cpu)
+                diagnostics['disk_space'].append(disk)
+                diagnostics['time'].append(time_date[1])
+                diagnostics['date'].append(time_date[0])
+
+        # dump file into data_logs for sender to handle later
+        f_name = secure_filename(f'station{station_num}_{curr_date}T{curr_time}Z_diagnostics.json')
+        with open(f'{HOME}data_logs/{f_name}', 'w') as out_f:
+            json.dump(diagnostics, out_f, indent=4)
+        
+        # reset contents of diag_file
+        open(diag_file, 'w').close()
+
+        # sleep until next day
+        elapsed = time.time() - start_measurement_cycle
+        time.sleep(SAMPLING_INTERVAL - elapsed)
+
+
+if __name__ == '__main__':
+    main()
