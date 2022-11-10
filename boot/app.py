@@ -23,7 +23,11 @@ You should have received a copy of the GNU General Public License along with
 
 from flask import Flask, request, render_template, redirect
 import os
-from modules import *
+import sys
+
+sys.path.append('/home/pi/')
+
+from packages.modules import *
 
 ##########
 

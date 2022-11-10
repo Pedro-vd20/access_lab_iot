@@ -25,9 +25,11 @@ import os
 import sys
 import requests as rqs
 import time
-#import modules
-from modules import *
 import signal
+
+sys.path.append('/home/pi/')
+
+from packages.modules import *
 
 NAME='access'
 URL = 'https://10.224.83.51:3500/'

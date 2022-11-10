@@ -21,7 +21,11 @@ You should have received a copy of the GNU General Public License along with
 
 '''
 
-from modules import *
+import sys
+
+sys.path.append('/home/pi/')
+
+from packages.modules import *
 
 # install python package
 def p_install(pkg):
