@@ -59,16 +59,16 @@ URL_LEN = 20
 
 #---------------------------------------------------------
 
-# write into log file
-def log(msg : str) -> void:
-    f = open('logs.txt', 'a')
-
+def log(msg):
     # get current time
-    now = datetime.datetime.now()
-    f.write(now.strftime('[%Y-%m-%d %H:%M:%S] '))
-    f.write(msg)
-    f.write('\n')
-    f.close()
+    now = datetime.datetime.now() 
+    year = now.year
+    month = now.month
+
+    with open('logs/{year}_{month}_logs.txt', 'a') as f:
+        f.write(now.strftime('[%Y-%m-%d %H:%M:%S] '))
+        f.write(msg + '\n')
+
 
 # check file extension for validity
 def allowed_file(filename: str) -> bool:
