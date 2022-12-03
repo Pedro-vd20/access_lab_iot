@@ -65,7 +65,7 @@ def log(msg):
     year = now.year
     month = now.month
 
-    with open('logs/{year}_{month}_logs.txt', 'a') as f:
+    with open(f'logs/{year}_{month}.txt', 'a') as f:
         f.write(now.strftime('[%Y-%m-%d %H:%M:%S] '))
         f.write(msg + '\n')
 
@@ -106,23 +106,36 @@ def gen_rand_string() -> str:
 # add an email to a station
 def register_email(auth, email):
     # load data
-    ids = open(PI_ID_F, 'r')
-    data = json.load(ids)
-    ids.close()
+    with open(PI_ID_F, 'r') as ids:
+        data = json.load(ids)
 
     # add email
     data[auth]['email'] = email
     # get station num
     num = data[auth]['station_num']
 
-    ids = open(PI_ID_F, 'w')
-    json.dump(data, ids, indent=4)
-    ids.close()
+    with open(PI_ID_F, 'w') as ids:
+        json.dump(data, ids, indent=4)
 
     # create folder for this station
-    os.system('mkdir ' + STORAGE_FOLDER + 'station' + str(num))
-    os.system('mkdir ' + DIAGNOSTICS + 'station' + str(num))
+    os.system(f'mkdir {STORAGE_FOLDER}station{num}')
+    os.system(f'mkdir {DIAGNOSTICS}station{num}')
+
+    return f'{STORAGE_FOLDER}station{num}'
     
+
+'''
+Collect the date from a given filename
+Files are written station<num>_<year>-<month>-<day>T<hour>Z.json
+'''
+def get_date(file_str):
+    date = file_str.split('_')[1].split('-')
+    year = date[0]
+    month = date[1]
+
+    return f'{year}_{month}'
+
+
 
 #---------------------------------------------------------
 
@@ -132,9 +145,9 @@ try:
     f.close()
     os.listdir(STORAGE_FOLDER)
     os.listdir(DIAGNOSTICS)
-except:
+except Exception as e:
     log('Error finding files and folders')
-    exit(-1)
+    raise(e)
 
 # dictionary to keep mapping of random urls to pi ids
 urls = {}
@@ -171,13 +184,37 @@ def register():
         log('Unauthorized access, rejected')
         return '401'
 
-    if email == None:
+    if email == None or 'sensor_config' not in request.files or \
+        'checksum' not in request.headers:
+        
         log('Required data not in request')    
         return '412'
 
     # add email to database
-    register_email(auth, email)
+    station_dir = register_email(auth, email)
     log('Email registered')
+
+    # save config file
+    datafile = request.files['sensor_config']
+    checksum = request.headers['checksum']
+
+    # check for empty fields / None
+    if ((datafile.filename == '') or (checksum == '')):
+        log('Empty file or checksum fields')
+        return '412'
+
+    # check for allowed file extensions
+    if (not allowed_file(datafile.filename)):
+        log('Unsupported file type')
+        return '415'
+
+    # save data and validate checksum
+    datafile.save(f'{station_dir}sensors_config.txt')
+    if not verify_checksum(f'{station_dir}sensors_config.txt', checksum):
+        # remove file
+        os.system(f'rm {station_dir}sensors_config.txt')
+        log('Sensor config file could not be verified')
+        return '500'
 
     return '200'
         
@@ -256,7 +293,11 @@ def get_file(url):
     if 'diagnostic' in datafile.filename:
         storage_folder = DIAGNOSTICS + 'station' + station_num + '/'
     else:
-        storage_folder = app.config['STORAGE_FOLDER'] + 'station' + station_num + '/'
+        storage_folder = app.config['STORAGE_FOLDER'] + 'station' + station_num + '/' + get_date(datafile.filename) + '/'
+        # Check if this folder exists, if not create
+        if not os.path.isdir(storage_folder):
+            os.mkdir(storage_folder)
+        
     data_f_name = os.path.join(storage_folder, secure_filename(datafile.filename))
     data_f_name_temp = os.path.join(storage_folder, secure_filename('temp_' + datafile.filename))
 
