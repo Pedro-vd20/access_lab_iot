@@ -24,7 +24,8 @@ You should have received a copy of the GNU General Public License along with
 
 import ACCESS_station_lib as access
 from sensors import *
-from modules import log
+from packages.modules import *
+import json
 
 
 # all this file will do is attempt to request measurements from all sensors
@@ -46,6 +47,16 @@ def main():
         print('Error connecting to sensors')
         log('Testing sensors failed, must check connection')
         raise(e)
+
+    # create config file
+    sensors_dict = {}
+    for sensor in sensors:
+        sensors_dict[sensor.SENSOR] = sensors_dict.get(sensor.SENSOR, 0) + 1
+
+    with open(f'{HOME}station.config', 'w') as f:
+        json.dump(sensors_dict, f, indent=4)
+
+    return 0
 
 
 if __name__ == '__main__':

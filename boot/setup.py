@@ -25,27 +25,25 @@ import os
 import sys
 import requests as rqs
 import time
-import signal
+import hashlib
+import json
 
 sys.path.append('/home/pi/')
-
 from packages.modules import *
+
+#----------
 
 NAME='access'
 URL = 'https://10.224.83.51:3500/'
 
+#----------
+
 # set up Pi as a router for user to connect to
 def router_setup():
     # reset wpa file
-    file_path = PATH + 'wpa_supplicant.conf'
-    try:
-        f = open(file_path, 'w')
-    except:
-        f = open(file_path, 'a')
-    
-    f.write('ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev\nupdate_config=1\ncountry=AE\n\n')
-    f.close()
-
+    with open(f'{PATH}wpa_supplicant.conf', 'w') as f:   
+        f.write('ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev\n' + \
+            'update_config=1\ncountry=AE\n\n')
 
     # enable wireless access post
     run('sudo systemctl unmask hostapd')
@@ -53,53 +51,44 @@ def router_setup():
 
     # define wireless configuration
     # check if already copied dhcpcd
-    try:
-        f = open(PATH + 'dhcpcd.conf.orig', 'r')
-        f.close()
-    except:
-        run('sudo mv /etc/dhcpcd.conf ' + PATH + 'dhcpcd.conf.orig')
+    if not os.path.exists(f'{PATH}dhcpcd.conf.orig'):
+        run(f'sudo mv /etc/dhcpcd.conf {PATH}dhcpcd.conf.orig')
     
     # copy original dhcpcd
-    run('cp ' + PATH + 'dhcpcd.conf.orig ' + PATH + 'dhcpcd.conf')
-    f = open(PATH + 'dhcpcd.conf', 'a')
-    f.write('\ninterface wlan0\n\tstatic ip_address=192.168.4.1/24\n\tnohook wpa_supplicant\n')
-    f.close()
+    run(f'cp {PATH}dhcpcd.conf.orig {PATH}dhcpcd.conf')
+    with open(PATH + 'dhcpcd.conf', 'a') as f:
+        f.write('\ninterface wlan0\n\tstatic ip_address=192.168.4.1/24\n\t' + \
+            'nohook wpa_supplicant\n')
 
-    run('sudo mv ' + PATH + 'dhcpcd.conf /etc/dhcpcd.conf')
+    run(f'sudo mv {PATH}dhcpcd.conf /etc/dhcpcd.conf')
 
     # configure DHCP and DNS
     # check if already copied dnsmasq.conf
-    try:
-        f = open(PATH + 'dnsmasq.conf.orig', 'r')
-        f.close()
-    except:
-        run('sudo cp /etc/dnsmasq.conf ' + PATH + 'dnsmasq.conf.orig')
+    if not os.path.exists(f'{PATH}dnsmasq.conf.orig'):
+        run(f'sudo cp /etc/dnsmasq.conf {PATH}dnsmasq.conf.orig')
     
     # set up dhsmasq configuration
-    try:
-        f = open(PATH + 'dnsmasq.conf', 'w')
-    except:
-        f = open(PATH + 'dnsmasq.conf', 'a')
-    f.write('interface=wlan0\ndhcp-range=192.168.4.2,192.168.4.20,255.255.255.0,24h\n\ndomain=wlan\naddress=/gw.wlan/192.168.4.1')
-    f.close()
+    with open(f'{PATH}dnsmasq.conf', 'w') as f:
+        f.write('interface=wlan0\ndhcp-range=192.168.4.2,' + \
+            '192.168.4.20,255.255.255.0,24h\n\ndomain=wlan\naddress=' + \
+            '/gw.wlan/192.168.4.1')
 
-    run('sudo mv ' + PATH + 'dnsmasq.conf /etc/dnsmasq.conf')
+    run(f'sudo mv {PATH}dnsmasq.conf /etc/dnsmasq.conf')
 
     # ensure wireless operation
     run('sudo rfkill unblock wlan')
 
     # configure hostapd software
-    try:
-        f = open(PATH + 'hostapd.conf', 'w')
-    except:
-        f = open(PATH + 'hostapd.conf', 'a')
-    f.write('country_code=AE\ninterface=wlan0\nssid=')
-    f.write(NAME)
-    f.write('\nhw_mode=g\nchannel=7\nmacaddr_acl=0\n#auth_algs=1\nignore_broadcast_ssid=0\nwpa=0\n#wpa=2\n#wpa_passphrase=password\n#wpa_key_mgmt=WPA-PSK\n#wpa_pairwise=TKIP\n#rsn_pairwise=CCMP\n') 
-    #f.write('\nhw_mode=g\nchannel=7\nmacaddr_acl=0\nauth_algs=1\nignore_broadcast_ssid=0\n#wpa=0\nwpa=2\nwpa_passphrase=password\nwpa_key_mgmt=WPA-PSK\nwpa_pairwise=TKIP\nrsn_pairwise=CCMP\n')
-    f.close()
+    with open(PATH + 'hostapd.conf', 'w') as f:
+        f.write('country_code=AE\ninterface=wlan0\nssid=')
+        f.write(NAME)
+        f.write('\nhw_mode=g\nchannel=7\nmacaddr_acl=0\n#auth_algs=1\n' + \
+            'ignore_broadcast_ssid=0\nwpa=0\n#wpa=2\n#wpa_passphrase=' + \
+            'password\n#wpa_key_mgmt=WPA-PSK\n#wpa_pairwise=TKIP\n' + \
+            '#rsn_pairwise=CCMP\n') 
+        #f.write('\nhw_mode=g\nchannel=7\nmacaddr_acl=0\nauth_algs=1\nignore_broadcast_ssid=0\n#wpa=0\nwpa=2\nwpa_passphrase=password\nwpa_key_mgmt=WPA-PSK\nwpa_pairwise=TKIP\nrsn_pairwise=CCMP\n')
 
-    run('sudo mv ' + PATH + 'hostapd.conf /etc/hostapd/hostapd.conf')
+    run(f'sudo mv {PATH}hostapd.conf /etc/hostapd/hostapd.conf')
 
     # enable dnsmasq in case disabled previously
     run('sudo systemctl enable dnsmasq') 
@@ -126,86 +115,77 @@ def revert_router():
     run('sudo rm /etc/hostapd/hostapd.conf')
 
     # restore dnsmasq.conf
-    run('sudo mv ' + PATH + 'dnsmasq.conf.orig /etc/dnsmasq.conf')
+    run(f'sudo mv {PATH}dnsmasq.conf.orig /etc/dnsmasq.conf')
 
     # restore dhcpcd
-    run('sudo mv ' + PATH + 'dhcpcd.conf.orig /etc/dhcpcd.conf')
+    run(f'sudo mv {PATH}dhcpcd.conf.orig /etc/dhcpcd.conf')
 
     # disable hostapd and dnsmasq
     run('sudo systemctl disable dnsmasq')
     run('sudo systemctl disable hostapd')
 
     # move wpa supplicant
-    run('sudo mv ' + PATH + 'networkconfig.txt /etc/wpa_supplicant/wpa_supplicant.conf')
+    run(f'sudo mv {PATH}networkconfig.txt /etc/wpa_supplicant/' + \
+        'wpa_supplicant.conf')
 
     # reboot
     run('sudo systemctl reboot')
 
 # throw an exception after enough time has passed
 def handler(signum, frame):
-    raise Exception('Too long to respond')
+    raise TimeoutError('Too long to respond')
 
 def test_connection():
     # wait for network to connect and return an ip address
     time.sleep(30)
-    # test for IP address
-    run('ip a | grep wlan0 > ' + PATH + 'network_diag.txt')
-    log('Collecting IP')
 
-    f = open(PATH + 'network_diag.txt', 'r')
-    text = ''.join(f.readlines())
-    f.close()
+    while True:
+        try:
+            if register_box() != '200':
+                raise(ConnectionError('Failed to register email'))
+            log('Pi is connected to the internet, starting data collection')
+            # if test network does not time out
+            write_state(5)
+            break
+        except rqs.exceptions.RequestException:
+            # connected to the router but timeout connecting to the internet
+            log('The Pi could not connect')
+            write_state(2)
+            router_setup()
+            exit(0)
+        except ConnectionError:
+            # server did not validate the data received, try send it again
+            log('Response error from server')
+            time.sleep(20)
 
-    f = open(PATH + 'network_diag.txt', 'w')
+    main() # if the function doesn't restart the pi and manages to escape the 
+        # loop then the network should be verified
 
-    if 'NO-CARRIER' in text: # no ip detected
-        log('Could not connect to wifi, reverting to wireless access network')
-        f.write('Failed to connect to the network. Make sure the password is correct')
-        f.close()
-        
-        # reboot pi and change settings
-        write_state(2)
-        router_setup()
-        exit(0)
-
-    signal.signal(signal.SIGALRM, handler)
-    signal.alarm(10) # set timeout timer for request
-
-    try:
-        if register_email() != '200':
-            raise(Exception('Failed to register email'))
-        log('Pi is connected to the internet, starting data collection')
-        signal.alarm(0) # turn off alarm
-        # if test network does not time out
-        write_state(5)
-    except:
-        # connected to the router but timeout connecting to the internet
-        f.write('The Pi could connect to the wifi but has no access to the internet. Be sure your wifi connection is working properly')
-        write_state(2)
-        log('Pi connected to the router but has no access to wifi')
-        router_setup()
-
-    f.close()
 
 
 # sends collected email address to server and serves to test connection
-def register_email():
-    sys.path.append(HOME)
+def register_box():
     from station_id import secret
 
     # collect email
-    with open(PATH + 'email.txt', 'r') as f:
+    with open(f'{PATH}email.txt', 'r') as f:
         email = f.readline().strip()
     
     url = URL + 'register/'
     headers = {'pi_id': secret, 'email': email}
-    cert = HOME + 'cert.pem'
+    cert = f'{HOME}cert.pem'   
+
+    # collect file detailing what sensors are on this box
+    with open(f'{HOME}sensors_config.txt', 'rb') as f:
+        hash_256 = hashlib.sha256(f.read()).hexdigest()
+
+    files = {'sensor_config': open(f'{HOME}sensors_config.txt', 'rb')}
+    headers['checksum'] = hash_256
 
     # send
     log('Sending email to register')
-    rsp = rqs.post(url, verify=cert, headers=headers)
+    rsp = rqs.post(url, verify=cert, headers=headers, files=files)
     return rsp.text
-
 
 
 def main():
