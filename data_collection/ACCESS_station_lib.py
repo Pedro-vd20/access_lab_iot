@@ -224,8 +224,33 @@ class GPSbeseecherGPIO:
 
 
 #--------------------------------------
+# With the exception of gps beseechers, all beseecher classes will be derived 
+# from the below parent class
+# All beseecher classes must therefore support the following:
+#   Have a .measure method which returns a dictionary of measurement-value pairs
+#   Have a .SENSOR attribute which will describe the things this sensor 
+#       measures (i.e particulate matter, air sensor etc)
+#   Have a .TYPE attribute which describes the model of the sensor 
+#       (i.e nextpm, bme280)
+#   Have a .index attribute which describes the index of that given sensor.
+#       If there are multiple sensors of the same .SENSOR attribute, this 
+#       differentiates them at the time of data collection
+#       The index attribute is assigned automatically by the sensors.py file
 
-class NEXTPMbeseecher:
+class Beseecher:
+    def __init__(self, sensor, sens_type, index=0):
+        self.SENSOR = sensor
+        self.TYPE = sens_type
+        self.index = index
+
+    def measure(self):
+        return {}
+
+
+#--------------------------------------
+
+
+class NEXTPMbeseecher(Beseecher):
     """Instantiate an object of this class by specifying the serial port
     device. E.g.:
 
@@ -293,10 +318,6 @@ class NEXTPMbeseecher:
     #INVALID_ANSW is b'\x16' which shouln'd be returned by any of 
     #the first 4 commands when the sensor is switched on.
     INVALID_ANSW  = 22 
-
-    # information for data_collection and error collection
-    SENSOR = 'particulate_matter'
-    TYPE = 'nextpm'
     
     def __init__(self,
                  port = '/dev/ttyAMA0',
@@ -307,7 +328,9 @@ class NEXTPMbeseecher:
                  timeout = 1.0,
                  index=0
                  ):
-        self.index = index
+        # initialize parent class
+        super().__init__('particulate_matter', 'nextpm', index)
+
         self.port = port
         self.serialprms = {
             'port':     port,
@@ -485,13 +508,10 @@ class NEXTPMbeseecher:
 
 # wrapper class to manage the bme 280 temperature, pressure and humidity sensor
 # handles setting mode, setting overscanning
-class BME280beseecher:
+class BME280beseecher(Beseecher):
 
     MODES = (0x00, 0x01, 0x03)
     OVERSCANS = (0x00, 0x01, 0x02, 0x03, 0x04, 0x05)
-
-    SENSOR = 'air_sensor'
-    TYPE = 'bme280'
     
 
     # i2c -> board.I2C() for the raspberry pi
@@ -507,7 +527,8 @@ class BME280beseecher:
                  index = 0
                 ):
         
-        self.index = index
+        # init parent class
+        super().__init__('air_sensor', 'bme280', index)
 
         if i2c == None:
             i2c = board.I2C()
@@ -621,10 +642,7 @@ class BME280beseecher:
 #-------------------------------------------------
 # wrapper class for the humidity-temperature-pressure sensor ms8607
 # requires the package adafruit-circuitpython-ms8607
-class MS8607beseecher:
-
-    SENSOR = 'air_sensor'
-    TYPE = 'ms8607'
+class MS8607beseecher(Beseecher):
 
     # i2c -> board.I2C() for the raspberry pi
     def __init__(self, 
@@ -632,7 +650,7 @@ class MS8607beseecher:
                  index = 0
                 ):
 
-        self.index = index
+        super().__init__('air_sensor', 'ms8607', index)
         
         if i2c == None:
             i2c = board.I2C()
@@ -663,7 +681,7 @@ class MS8607beseecher:
 # Provides an error class that can be initiated when the script fails to 
 # initialize any sensor
 # Only goal is to keep a sensor object so diagnostics can encounter error and send information
-class ErrorBeseecher:
+class ErrorBeseecher(Beseecher):
 
     # Only stores an error message
     # @param type -> brand of sensor (i.e BME280, NEXTPM, etc)
@@ -672,17 +690,16 @@ class ErrorBeseecher:
         # beseecher initialized successfully
     def __init__(self, sensor, type, msg='Error at boot', index = 0):
         # message to display when exception is raised
-        self.index = 0
+        super().__init__(sensor, type, index)
         self.message = msg
-        self.TYPE = type
-        self.SENSOR = sensor
 
     def measure(self): # only here to artificially raise an exception
         # return exception as dictionary
         raise(Exception(self.message))
+
 #--------------------------------------
 # Sensirion sps30 dust sensor.
-class SPS30beseecher:
+class SPS30beseecher(Beseecher):
     """Wrapper around the 'SPS30' class (from https://github.com/dvsu/sps30).
 
 Usage: 
@@ -710,16 +727,13 @@ an auto-cleaning interval may also be specified (defaults to 1 day).
                 'laser_status': 'Las_error',
                 }
 
-    SENSOR = 'particulate_matter'
-    TYPE = 'sps30'
-
     def __init__(self,
                  i2c_bus_number = 1,
                  cleaning_interval_in_days = 1,
                  index = 0
                  ):
 
-        self.index = index
+        super().__init__('particulate_matter', 'sps30', index)
 
         # The following raises a 'FileNotFoundError' exception if
         # the specified i2c bus does not exists.
