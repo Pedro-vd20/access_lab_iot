@@ -1,7 +1,4 @@
 '''
-ACCESS Lab, hereby disclaims all copyright interest in the program “ACCESS IOT 
-Stations” (which collects air and climate data) written by Francesco Paparella, 
-Pedro Velasquez.
 
 Copyright (C) 2022 Francesco Paparella, Pedro Velasquez
 
@@ -22,10 +19,10 @@ You should have received a copy of the GNU General Public License along with
 '''
 
 
-import ACCESS_station_lib as access
-from sensors import *
-from packages.modules import *
+import sensors as sens
+import packages.modules as modules
 import json
+import os
 
 
 # all this file will do is attempt to request measurements from all sensors
@@ -33,27 +30,27 @@ import json
 def main():
     try:
         print('Testing Sensors')
-        for i in range(len(sensors)):
+        for i in range(len(sens.sensors)):
             print('Testing', i)
-            print(sensors[i].measure())
+            print(sens.sensors[i].measure())
         print()
 
 
         print('Testing GPS')
-        print(gps.fix())
+        print(sens.gps.fix())
         print()
 
     except Exception as e:
         print('Error connecting to sensors')
-        log('Testing sensors failed, must check connection')
+        modules.log('Testing sensors failed, must check connection')
         raise(e)
 
     # create config file
     sensors_dict = {}
-    for sensor in sensors:
+    for sensor in sens.sensors:
         sensors_dict[sensor.SENSOR] = sensors_dict.get(sensor.SENSOR, 0) + 1
 
-    with open(f'{HOME}station.config', 'w') as f:
+    with open(os.path.join(modules.HOME, 'station.config'), 'w') as f:
         json.dump(sensors_dict, f, indent=4)
 
     return 0

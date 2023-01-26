@@ -1,7 +1,4 @@
 '''
-ACCESS Lab, hereby disclaims all copyright interest in the program “ACCESS IOT 
-Stations” (which collects air and climate data) written by Francesco Paparella, 
-Pedro Velasquez.
 
 Copyright (C) 2022 Francesco Paparella, Pedro Velasquez
 
@@ -61,7 +58,7 @@ def check_args(args):
 
     # check is_diag as boolean
     if is_diag not in ('True', 'False'):
-        raise(ValueError(f'Could not convert {is_diag} to boolean'))
+        raise(ValueError(f"Could not convert '{is_diag}' to boolean"))
 
     is_diag = (is_diag == 'True')
 
@@ -138,6 +135,7 @@ def main():
                     if s is None:
                         continue
                     
+                    # currently not implemented
                     if 'diagnostics' in s:
                         for key in s['diagnostics']:
                             print(s['diagnostics'][key])

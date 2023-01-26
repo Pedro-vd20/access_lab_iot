@@ -1,7 +1,4 @@
 '''
-ACCESS Lab, hereby disclaims all copyright interest in the program “ACCESS IOT 
-Stations” (which collects air and climate data) written by Francesco Paparella, 
-Pedro Velasquez.
 
 Copyright (C) 2022 Francesco Paparella, Pedro Velasquez
 
@@ -22,15 +19,12 @@ You should have received a copy of the GNU General Public License along with
 '''
 
 import time
-import datetime
 import json
 import os
 import sys
-from shutil import disk_usage
-from gpiozero import CPUTemperature
-from station_id import *
+import station_id as station
 from werkzeug.utils import secure_filename
-from packages.modules import *
+import packages.modules as modules
 
 #----------
 
@@ -49,15 +43,16 @@ SAMPLING_INTERVAL = 86400 #in seconds
 time.sleep(20)
 
 def main():
-    diag_file = f'{HOME}station{station_num}_diagnostics.txt'
-    time_file = f'{HOME}time.txt'
+    diag_file = os.path.join(modules.HOME, f'station{station.station_num}' + \
+        '_diagnostics.txt')
+    time_file = os.path.join(modules.HOME, 'time.txt')
 
     while True:
         start_measurement_cycle = time.time()
 
         # check if diag file exists (regularly filled by data_collection.py)
         if not (os.path.isfile(diag_file) and os.path.isfile(time_file)):
-            log('No diagnostics to send')
+            modules.log('No diagnostics to send')
             time.sleep(600)
             continue
 
@@ -87,13 +82,13 @@ def main():
         
         # Check again if file is empty, sleep for data_collection to fill diagnostics
         if len(lines) == 0:
-            log('No diagnotics to send')
+            modules.log('No diagnotics to send')
             time.sleep(600)
             continue
 
         # data structure to fill in and send to server
         diagnostics = {
-            'id': secret,
+            'id': station.secret,
             'cpu_temp': [],
             'disk_space': [],
             'time': [],
@@ -128,8 +123,9 @@ def main():
                 diagnostics['date'].append(time_date[0])
 
         # dump file into data_logs for sender to handle later
-        f_name = secure_filename(f'station{station_num}_{curr_date}T{curr_time}Z_diagnostics.json')
-        with open(f'{HOME}data_logs/{f_name}', 'w') as out_f:
+        f_name = secure_filename(f'station{station.station_num}_{curr_date}T' + \
+            f'{curr_time}Z_diagnostics.json')
+        with open(os.path.join(modules.HOME, 'data_logs/', f_name), 'w') as out_f:
             json.dump(diagnostics, out_f, indent=4)
         
         # reset contents of diag_file

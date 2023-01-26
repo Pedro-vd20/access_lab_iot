@@ -1,7 +1,4 @@
 '''
-ACCESS Lab, hereby disclaims all copyright interest in the program “ACCESS IOT 
-Stations” (which collects air and climate data) written by Francesco Paparella, 
-Pedro Velasquez.
 
 Copyright (C) 2022 Francesco Paparella, Pedro Velasquez
 
@@ -31,13 +28,11 @@ import pandas as pd
 
 # collect data in numpy format
 def collect_data(station_num):
-    path = '/home/pv850/received_files/station' + str(station_num) + '/'
-    try:
-        files = os.listdir(path)
-    except FileNotFoundError as e:
-        print('Station not found, please pass station_num parameter as integer corresponding to station')
-        print(path, 'not found')
-        raise(e)
+    path = os.path.join('/home/pv850/received_files/station', str(station_num))
+    if not os.path.isdir(path):
+        raise(FileNotFoundError(f'{path} not found'))
+    
+    files = os.listdir(path)
 
     # remove checksum files
     files = [f if 'sha256' not in f else None for f in files]
@@ -50,7 +45,7 @@ def collect_data(station_num):
     num_files = len(files)
     
     # find out number of sensors for each
-    with open(path + files[0], 'r') as f_read:
+    with open(os.path.join(path, files[0]), 'r') as f_read:
         data = json.load(f_read)
     num_pm = len(data['particulate_matter'])
     num_air_sens = len(data['air_sensor'])
@@ -95,7 +90,7 @@ def collect_data(station_num):
     # loop through files collecting data
     for i in range(len(files)):
         # collect json data
-        with open(path + files[i], 'r') as f_read:
+        with open(os.path.join(path, files[i]), 'r') as f_read:
             data = json.load(f_read)
 
         # add pm

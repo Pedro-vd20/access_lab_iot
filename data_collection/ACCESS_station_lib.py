@@ -1,7 +1,4 @@
 '''
-ACCESS Lab, hereby disclaims all copyright interest in the program “ACCESS IOT 
-Stations” (which collects air and climate data) written by Francesco Paparella, 
-Pedro Velasquez.
 
 Copyright (C) 2022 Francesco Paparella, Pedro Velasquez
 
@@ -27,18 +24,18 @@ import pigpio
 import time
 import pynmea2
 from pynmea2.nmea import ChecksumError, ParseError
-from datetime import datetime
+import datetime as dt
 from adafruit_bme280 import advanced as adafruit_bme280 #pip3 install adafruit-circuitpython-bme280
 import adafruit_ms8607   #pip3 install adafruit-circuitpython-ms8607
 import board
 import busio
+import sys
 
 # ----- Imports for the sps30 dust sensor. -----
 #download from: https://github.com/dvsu/sps30 (MIT license) and unpack
 #in 'sps30_for_ACCESS', must be a subfolder of the folder containing
 #'ACCESS_station_lib.py'.
 try:
-    import sys
     sys.path.append('/home/pi/sps30_for_ACCESS')
     from sps30_for_ACCESS.sps30 import SPS30
 except ModuleNotFoundError:
@@ -46,6 +43,7 @@ except ModuleNotFoundError:
 # ----- end imports for the sps30 dust sensor. -----
 
 #------------------------------------------------------
+
 class GPSbeseecher:
     def __init__(self,
                  port = '/dev/ttySOFT0',
@@ -123,7 +121,7 @@ class GPSbeseecher:
                     break
             #If GPS doesn't work, just set the time using the computer's clock.
             if gpsfix['time'] is None:
-                CPUdate, CPUtime = datetime.utcnow().isoformat().split('T')
+                CPUdate, CPUtime = dt.datetime.utcnow().isoformat().split('T')
                 gpsfix['time'] = CPUtime.split('.')[0]
                 gpsfix['date'] = CPUdate
             return gpsfix
@@ -216,11 +214,11 @@ class GPSbeseecherGPIO:
         self.gpio.bb_serial_read_close(self.RX_pin)
         #If GPS doesn't work, just set the time using the computer's clock.
         if gpsfix['time'] is None:
-            CPUdate, CPUtime = datetime.utcnow().isoformat().split('T')
+            CPUdate, CPUtime = dt.datetime.utcnow().isoformat().split('T')
             gpsfix['time'] = CPUtime.split('.')[0]
             gpsfix['date'] = CPUdate
         if gpsfix['date'] is None:
-            CPUdate, CPUtime = datetime.utcnow().isoformat().split('T')
+            CPUdate, CPUtime = dt.datetime.utcnow().isoformat().split('T')
             gpsfix['date'] = CPUdate
         return gpsfix
 
@@ -432,7 +430,7 @@ class NEXTPMbeseecher:
             """)
         return {
             "type": self.TYPE,
-            "sensor": self.SENSOR,
+            "sensor": f'{self.SENSOR}{self.index}',
             'PM1count':   int.from_bytes(res[3:5], 'big'),
             'PM2.5count': int.from_bytes(res[5:7], 'big'),
             'PM10count':  int.from_bytes(res[7:9], 'big'),
@@ -543,7 +541,7 @@ class BME280beseecher:
 
         return {
             'type': self.TYPE,
-            'sensor': self.SENSOR,
+            'sensor': f'{self.SENSOR}{self.index}',
             'humidity': hum,
             'temperature': temp,
             'pressure': prssr
@@ -656,7 +654,7 @@ class MS8607beseecher:
 
         return {
             'type': self.TYPE,
-            'sensor': self.SENSOR,
+            'sensor': f'{self.SENSOR}{self.index}',
             'humidity': hum,
             'temperature': temp,
             'pressure': prssr
@@ -733,7 +731,7 @@ an auto-cleaning interval may also be specified (defaults to 1 day).
                                      
     def measure(self):
         sensor_data = self.sps.get_measurement()['sensor_data']
-        results = {'type': self.TYPE, 'sensor': self.SENSOR}
+        results = {'type': self.TYPE, 'sensor': f'{self.SENSOR}{self.index}'}
         for k in sensor_data['mass_density'].keys():
             results[self.tr_mass[k]] = sensor_data['mass_density'][k]
         for k in sensor_data['particle_count'].keys():

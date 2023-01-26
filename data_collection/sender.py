@@ -1,7 +1,4 @@
 '''
-ACCESS Lab, hereby disclaims all copyright interest in the program “ACCESS IOT 
-Stations” (which collects air and climate data) written by Francesco Paparella, 
-Pedro Velasquez.
 
 Copyright (C) 2022 Francesco Paparella, Pedro Velasquez
 
@@ -25,13 +22,12 @@ import requests as rqs
 import sys
 import os
 import hashlib
-from packages.modules import *
+import packages.modules as modules
 
 try:
-    from station_id import *
+    import station_id as station
 except ModuleNotFoundError:
-    print('PI id not found')
-    exit(-1)
+    raise(ModuleNotFoundError('Pi ID could not be found'))
 
 '''def main():
 
@@ -68,34 +64,34 @@ def main(args):
     # collect arg info
     if (len(args) < 4):
         print(len(args))
-        log('Missing arguments, stopping sender')
+        modules.log('Missing arguments, stopping sender')
         return -1 
     
-    URL = 'https://' + args[1] + ':3500/upload'
+    URL = f'https://{args[1]}:3500/upload'
     FOLDER = args[2]
-    VERIFY = HOME + 'cert.pem'
+    VERIFY = os.path.join(modules.HOME, 'cert.pem')
 
     # check how many files need to be sent
-    try:    
-        dir_list = os.listdir(FOLDER)
-    except:
-        log(FOLDER + ' not a valid directory, stopping sender')
+    if not os.path.isdir(FOLDER):
+        modules.log(f'{FOLDER} not a valid directory, stopping sender')
         return -1
+
+    dir_list = os.listdir(FOLDER)
     num_files = len(dir_list)
 
     # send authentication request to server
-    headers = {'pi_id': secret, 'pi_num': station_num}
+    headers = {'pi_id': station.secret, 'pi_num': station.station_num}
     try:    
         response = rqs.get(URL, headers=headers, verify=VERIFY).text.strip()
-    except:
-        log(URL + ' can\'t be reached, stopping sender')
+    except rqs.exceptions.RequestException:
+        modules.log(f'{URL} can\'t be reached, stopping sender')
         return -1
     
     print(response)
 
     # check if response is a success
     if(response == '401'): # empty response means error
-        log("Sender authentication failed")
+        modules.log("Sender authentication failed")
         return -1    # FIGURE OUT WHAT TO DO HERE
         # here we must set some flag to indicate the sending failed for this file
     
@@ -103,32 +99,29 @@ def main(args):
     response = response.strip().split(' ')[1]
 
     # check if dest folder exists
-    DEST_FOLDER = FOLDER + '../sent_files/'
-    try:
-        os.listdir(DEST_FOLDER)
-    except:
-        os.system('mkdir ' + DEST_FOLDER)
-
-
+    DEST_FOLDER = os.path.join(FOLDER, '../sent_files/')
+    if not os.path.isdir(DEST_FOLDER):
+        os.mkdir(DEST_FOLDER)
+    
     # loop through all files
-    log('Sending files')
+    modules.log('Sending files')
     for send_file in dir_list:
         # get hash
-        with open(FOLDER + send_file, 'rb') as f:
+        with open(os.path.join(FOLDER, send_file), 'rb') as f:
             hash_256 = hashlib.sha256(f.read()).hexdigest()
             headers['checksum'] = hash_256
 
         headers['num_files'] = str(num_files) # send server num of files left to send
 
         # collect file
-        files = {'sensor_data_file': open(FOLDER + send_file, 'rb')}
+        files = {'sensor_data_file': open(os.path.join(FOLDER, send_file), 'rb')}
 
         # send request
         try:
-            rsp = rqs.post(URL + '/' + response, 
+            rsp = rqs.post(os.path.join(URL, response), 
                     files=files, headers=headers, verify=VERIFY).text.strip()
-        except:
-            log(URL + '/upload/' + response + ' can\'t be reached')
+        except rqs.exceptions.RequestException:
+            modules.log(f'{os.path.join(URL, "upload", response)} can\'t be reached')
             return -1
 
         files['sensor_data_file'].close()
@@ -136,10 +129,10 @@ def main(args):
         # check if success
         if (rsp == '200'):
             # move file to sent folder
-            os.system('mv ' + FOLDER + send_file + ' ' + DEST_FOLDER)
-            log(send_file + ' sent')
+            os.system(f'mv {os.path.join(FOLDER, send_file)} {DEST_FOLDER}')
+            modules.log(f'{send_file} sent')
         else:
-            log(send_file + ' could not be sent')
+            modules.log(f'{send_file} could not be sent')
 
         num_files -= 1
 

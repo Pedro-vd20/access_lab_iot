@@ -1,7 +1,4 @@
 '''
-ACCESS Lab, hereby disclaims all copyright interest in the program “ACCESS IOT 
-Stations” (which collects air and climate data) written by Francesco Paparella, 
-Pedro Velasquez.
 
 Copyright (C) 2022 Francesco Paparella, Pedro Velasquez
 
@@ -26,10 +23,10 @@ import sys
 import requests as rqs
 import time
 import hashlib
-import json
 
 sys.path.append('/home/pi/')
-from packages.modules import *
+import packages.modules as modules
+import station_id as station
 
 #----------
 
@@ -38,103 +35,118 @@ URL = 'https://10.224.83.51:3500/'
 
 #----------
 
-# set up Pi as a router for user to connect to
+'''
+Creates and modifies all configuration files required to turn the pi into a 
+wireless access point
+'''
 def router_setup():
     # reset wpa file
-    with open(f'{PATH}wpa_supplicant.conf', 'w') as f:   
+    with open(os.path.join(modules.PATH, 'wpa_supplicant.conf'), 'w') as f:   
         f.write('ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev\n' + \
             'update_config=1\ncountry=AE\n\n')
 
     # enable wireless access post
-    run('sudo systemctl unmask hostapd')
-    run('sudo systemctl enable hostapd')
+    os.system('sudo systemctl unmask hostapd')
+    os.system('sudo systemctl enable hostapd')
 
     # define wireless configuration
     # check if already copied dhcpcd
-    if not os.path.exists(f'{PATH}dhcpcd.conf.orig'):
-        run(f'sudo mv /etc/dhcpcd.conf {PATH}dhcpcd.conf.orig')
+    dhcpcd_orig = os.path.join(modules.PATH, 'dhcpcd.conf.orig')
+    dhcpcd_path = os.path.join(modules.PATH, 'dhcpcd.conf')
+    if not os.path.exists(dhcpcd_orig):
+        os.system(f'sudo mv /etc/dhcpcd.conf {dhcpcd_path}')
     
     # copy original dhcpcd
-    run(f'cp {PATH}dhcpcd.conf.orig {PATH}dhcpcd.conf')
-    with open(PATH + 'dhcpcd.conf', 'a') as f:
+    os.system(f'cp {dhcpcd_orig} {dhcpcd_path}')
+    with open(dhcpcd_path, 'a') as f:
         f.write('\ninterface wlan0\n\tstatic ip_address=192.168.4.1/24\n\t' + \
             'nohook wpa_supplicant\n')
 
-    run(f'sudo mv {PATH}dhcpcd.conf /etc/dhcpcd.conf')
+    os.system(f'sudo mv {dhcpcd_path} /etc/dhcpcd.conf')
 
     # configure DHCP and DNS
     # check if already copied dnsmasq.conf
-    if not os.path.exists(f'{PATH}dnsmasq.conf.orig'):
-        run(f'sudo cp /etc/dnsmasq.conf {PATH}dnsmasq.conf.orig')
+    dnsmasq_orig = os.path.join(modules.PATH, 'dnsmasq.conf.orig')
+    dnsmasq_path = os.path.join(modules.PATH, 'dnsmasq.conf')
+    if not os.path.exists(dnsmasq_orig):
+        os.system(f'sudo cp /etc/dnsmasq.conf {dnsmasq_orig}')
     
     # set up dhsmasq configuration
-    with open(f'{PATH}dnsmasq.conf', 'w') as f:
+    with open(f'{dnsmasq_path}', 'w') as f:
         f.write('interface=wlan0\ndhcp-range=192.168.4.2,' + \
             '192.168.4.20,255.255.255.0,24h\n\ndomain=wlan\naddress=' + \
             '/gw.wlan/192.168.4.1')
 
-    run(f'sudo mv {PATH}dnsmasq.conf /etc/dnsmasq.conf')
+    os.system(f'sudo mv {dnsmasq_path} /etc/dnsmasq.conf')
 
     # ensure wireless operation
-    run('sudo rfkill unblock wlan')
+    os.system('sudo rfkill unblock wlan')
 
     # configure hostapd software
-    with open(PATH + 'hostapd.conf', 'w') as f:
-        f.write('country_code=AE\ninterface=wlan0\nssid=')
-        f.write(NAME)
-        f.write('\nhw_mode=g\nchannel=7\nmacaddr_acl=0\n#auth_algs=1\n' + \
-            'ignore_broadcast_ssid=0\nwpa=0\n#wpa=2\n#wpa_passphrase=' + \
-            'password\n#wpa_key_mgmt=WPA-PSK\n#wpa_pairwise=TKIP\n' + \
-            '#rsn_pairwise=CCMP\n') 
+    hostapd_path = os.path.join(modules.PATH, 'hostapd.conf')
+    with open(hostapd_path, 'w') as f:
+        f.write(f'country_code=AE\ninterface=wlan0\nssid={NAME}\nhw_mode=g\n' + \
+            'channel=7\nmacaddr_acl=0\n#auth_algs=1\nignore_broadcast_ssid=0\n' + \
+            'wpa=0\n#wpa=2\n#wpa_passphrase=password\n#wpa_key_mgmt=WPA-PSK\n' + \
+            '#wpa_pairwise=TKIP\n#rsn_pairwise=CCMP\n') 
         #f.write('\nhw_mode=g\nchannel=7\nmacaddr_acl=0\nauth_algs=1\nignore_broadcast_ssid=0\n#wpa=0\nwpa=2\nwpa_passphrase=password\nwpa_key_mgmt=WPA-PSK\nwpa_pairwise=TKIP\nrsn_pairwise=CCMP\n')
 
-    run(f'sudo mv {PATH}hostapd.conf /etc/hostapd/hostapd.conf')
+    modules.run(f'sudo mv {hostapd_path} /etc/hostapd/hostapd.conf')
 
     # enable dnsmasq in case disabled previously
-    run('sudo systemctl enable dnsmasq') 
+    os.system('sudo systemctl enable dnsmasq') 
 
-    log('Pi configured as wireless access point')
+    modules.log('Pi configured as wireless access point')
 
     # reboot system
-    run('sudo systemctl reboot') 
+    os.system('sudo systemctl reboot') 
 
 
-# start flask server to collect wifi info
+'''
+Starts flask app which hosts page for users to fill form with wifi information
+Precondition: pi is set up as wireless access point
+'''
 def start_flask():
     time.sleep(5)
     #run('sudo systemctl enable flask_app')
-    run('sudo systemctl restart flask_app')
-    log('Running Flask server')
+    os.system('sudo systemctl restart flask_app')
+    modules.log('Running Flask server')
 
-# reverts the pi to connecting to the internet rather than acting as a router
+'''
+Reverts pi from being a wireless access point back to normal functionality
+Precondition: router_setup() must have run first. This method depends on files
+    created by router_setup
+'''
 def revert_router():
     # lets flask app finish running before rebooting pi
     time.sleep(2)
 
     # remove hostapd.conf
-    run('sudo rm /etc/hostapd/hostapd.conf')
+    os.system('sudo rm /etc/hostapd/hostapd.conf')
 
     # restore dnsmasq.conf
-    run(f'sudo mv {PATH}dnsmasq.conf.orig /etc/dnsmasq.conf')
+    os.system(f'sudo mv {os.path.join(modules.PATH, "dnsmasq.conf.orig")} ' + \
+        '/etc/dnsmasq.conf')
 
     # restore dhcpcd
-    run(f'sudo mv {PATH}dhcpcd.conf.orig /etc/dhcpcd.conf')
+    os.system(f'sudo mv {os.path.join(modules.PATH, "dhcpcd.conf.orig")} ' + \
+        '/etc/dhcpcd.conf')
 
     # disable hostapd and dnsmasq
-    run('sudo systemctl disable dnsmasq')
-    run('sudo systemctl disable hostapd')
+    os.system('sudo systemctl disable dnsmasq')
+    os.system('sudo systemctl disable hostapd')
 
     # move wpa supplicant
-    run(f'sudo mv {PATH}networkconfig.txt /etc/wpa_supplicant/' + \
-        'wpa_supplicant.conf')
+    os.system(f'sudo mv {os.path.join(modules.PATH, "networkconfig.txt")} ' + \
+        '/etc/wpa_supplicant/wpa_supplicant.conf')
 
     # reboot
-    run('sudo systemctl reboot')
+    os.system('sudo systemctl reboot')
 
-# throw an exception after enough time has passed
-def handler(signum, frame):
-    raise TimeoutError('Too long to respond')
-
+'''
+Attempts to communicate with central server to test if pi is connected to the internet
+Precondition: pi must NOT be set up as a wireless access network
+'''
 def test_connection():
     # wait for network to connect and return an ip address
     time.sleep(30)
@@ -143,19 +155,19 @@ def test_connection():
         try:
             if register_box() != '200':
                 raise(ConnectionError('Failed to register email'))
-            log('Pi is connected to the internet, starting data collection')
+            modules.log('Pi is connected to the internet, starting data collection')
             # if test network does not time out
-            write_state(5)
+            modules.write_state(5)
             break
         except rqs.exceptions.RequestException:
             # connected to the router but timeout connecting to the internet
-            log('The Pi could not connect')
-            write_state(2)
+            modules.log('The Pi could not connect')
+            modules.write_state(2)
             router_setup()
             exit(0)
         except ConnectionError:
             # server did not validate the data received, try send it again
-            log('Response error from server')
+            modules.log('Response error from server')
             time.sleep(20)
 
     main() # if the function doesn't restart the pi and manages to escape the 
@@ -163,66 +175,65 @@ def test_connection():
 
 
 
-# sends collected email address to server and serves to test connection
+'''
+Sends user email and sensor configuration information to central server
+'''
 def register_box():
-    from station_id import secret
 
     # collect email
-    with open(f'{PATH}email.txt', 'r') as f:
+    with open(os.path.join(modules.PATH, "email.txt"), 'r') as f:
         email = f.readline().strip()
     
-    url = URL + 'register/'
-    headers = {'pi_id': secret, 'email': email}
-    cert = f'{HOME}cert.pem'   
+    url = os.path.join(URL, 'register/')
+    headers = {'pi_id': station.secret, 'email': email}
+    cert = os.path.join(modules.HOME, 'cert.pem')
 
     # collect file detailing what sensors are on this box
-    with open(f'{HOME}sensors_config.txt', 'rb') as f:
+    with open(os.path.join(modules.HOME, 'sensors_config.txt'), 'rb') as f:
         hash_256 = hashlib.sha256(f.read()).hexdigest()
 
-    files = {'sensor_config': open(f'{HOME}sensors_config.txt', 'rb')}
+    files = {'sensor_config': open(os.path.join(modules.HOME, 'sensors_config.txt'), 'rb')}
     headers['checksum'] = hash_256
 
     # send
-    log('Sending email to register')
+    modules.log('Sending email to register')
     rsp = rqs.post(url, verify=cert, headers=headers, files=files)
     return rsp.text
 
 
 def main():
     # check state of machine
-    try:
-        # try read file with state
-        f = open(PATH + STATE, 'r')
-        state = int(f.readline().strip())
-        f.close()
-    except:
-        # file not found, assume state is 0
+    state_path = os.path.join(modules.PATH, modules.STATE)
+    if not os.path.isfile(state_path):
         state = 1
+    else:
+        with open(state_path, 'r') as f:
+            state = int(f.readline().strip())
 
-    log('Current state: ' + str(state))
+    modules.log(f'Current state: {state}')
 
     if state == 1: # packages downloaded, Pi now needs to set up as a router
-        write_state(2)
+        modules.write_state(2)
         router_setup()
     elif state == 2: # start up flask app
         # state will not change until form is submitted
         start_flask()
     elif state == 3: # pi must test connection to wifi
-        write_state(4)
-        log('Pi will stop serving as a wireless access point')
+        modules.write_state(4)
+        modules.log('Pi will stop serving as a wireless access point')
         revert_router()
     elif state == 4:
-        log('Testing wifi connection')
+        modules.log('Testing wifi connection')
         test_connection()
     # state 3 will keep Pi as wireless access point but test wifi
     # state 4 will revert pi as router
     # state 5 will start the detection and measurement
     elif state == 5:
        
-        log('Starting data collection')
+        modules.log('Starting data collection')
         time.sleep(20)
-        run('sudo systemctl start diagnostics')
-        run('python3 ' + HOME + 'data_collection.py')
+        os.system('sudo systemctl start diagnostics')
+        os.system(f'python3 {os.path.join(modules.HOME, "data_collection.py")}')
         print('Working!')
 
 

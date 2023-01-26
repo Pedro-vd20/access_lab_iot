@@ -1,7 +1,4 @@
 '''
-ACCESS Lab, hereby disclaims all copyright interest in the program “ACCESS IOT 
-Stations” (which collects air and climate data) written by Francesco Paparella, 
-Pedro Velasquez.
 
 Copyright (C) 2022 Francesco Paparella, Pedro Velasquez
 
@@ -40,8 +37,7 @@ where:
 import os
 import hashlib
 import datetime
-from flask import Flask, flash, request, redirect, url_for
-from numpy import void
+from flask import Flask, request
 from werkzeug.utils import secure_filename
 from random import choice
 from string import ascii_letters
@@ -67,17 +63,21 @@ def log(msg):
 
     with open(f'logs/{year}_{month}.txt', 'a') as f:
         f.write(now.strftime('[%Y-%m-%d %H:%M:%S] '))
-        f.write(msg + '\n')
+        f.write(f'{msg}\n')
 
 
 # check file extension for validity
-def allowed_file(filename: str) -> bool:
+def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
 # check the checksum of a file
-def verify_checksum(fname: str, chksm: str) -> bool:
+def verify_checksum(fname, chksm):
+    # check file validity
+    if not os.path.isfile(fname):
+        return False
+    
     with open(fname, 'rb') as f:
         hash_256 = hashlib.sha256(f.read()).hexdigest()
     
@@ -85,22 +85,22 @@ def verify_checksum(fname: str, chksm: str) -> bool:
 
 
 # verify a pi's id
-def is_auth(pi_id: str) -> bool:
-
+def is_auth(pi_id):
+    # check for empty arg
     if pi_id == '':
         return False
 
     # load ids
-    ids = open(PI_ID_F, 'r')
-    data = json.load(ids)
-    ids.close()
+    with open(PI_ID_F, 'r') as ids:
+        data = json.load(ids)
+    
 
     auth = data.get(pi_id, None)
     return auth != None
     
 
 # generate random string
-def gen_rand_string() -> str:
+def gen_rand_string():
     return ''.join([choice(ascii_letters) for i in range(URL_LEN)])
 
 # add an email to a station
@@ -114,6 +114,7 @@ def register_email(auth, email):
     # get station num
     num = data[auth]['station_num']
 
+    # save info
     with open(PI_ID_F, 'w') as ids:
         json.dump(data, ids, indent=4)
 
@@ -140,14 +141,12 @@ def get_date(file_str):
 #---------------------------------------------------------
 
 # make sure the necessary paths are available
-try:
-    f = open(PI_ID_F, 'r')
-    f.close()
-    os.listdir(STORAGE_FOLDER)
-    os.listdir(DIAGNOSTICS)
-except Exception as e:
+if not (os.path.isfile(PI_ID_F) and \
+  os.path.isdir(STORAGE_FOLDER) and \
+  os.path.isdir(DIAGNOSTICS)):
     log('Error finding files and folders')
-    raise(e)
+    raise(FileNotFoundError('Missing files and folders'))
+
 
 # dictionary to keep mapping of random urls to pi ids
 urls = {}
@@ -184,6 +183,7 @@ def register():
         log('Unauthorized access, rejected')
         return '401'
 
+    # Missing data
     if email == None or 'sensor_config' not in request.files or \
         'checksum' not in request.headers:
         
@@ -226,7 +226,6 @@ def register():
 def authenticate():
     # collect headers from request
     auth = request.headers.get('pi_id', None)
-    num_files = request.headers.get('num_files', None)
 
     # if request has no authentication or wrong id
     if ((auth == None) or (not is_auth(auth))):
@@ -240,7 +239,7 @@ def authenticate():
     while urls.get(url, None) != None:
         url = gen_rand_string()
 
-    log('New request from ' + auth + ', opening ' + '/upload/' + url)
+    log(f'New request from {auth}, opening /upload/{url}')
 
     # store mapping of id to random url
     urls[url] = auth      
@@ -262,6 +261,7 @@ def get_file(url):
         return '401'
 
     # check how many remaining files
+    #   all arguments are in string form
     num_files = request.headers.get('num_files', '1')
     if(num_files == '1'):
         # remove url - pi pair from existing urls
@@ -291,9 +291,10 @@ def get_file(url):
     
     # create local names for files
     if 'diagnostic' in datafile.filename:
-        storage_folder = DIAGNOSTICS + 'station' + station_num + '/'
+        storage_folder = f'{DIAGNOSTICS}station{station_num}/'
     else:
-        storage_folder = app.config['STORAGE_FOLDER'] + 'station' + station_num + '/' + get_date(datafile.filename) + '/'
+        storage_folder = f'{STORAGE_FOLDER}station{station_num}/' + \
+            f'{get_date(datafile.filename)}/'
         # Check if this folder exists, if not create
         if not os.path.isdir(storage_folder):
             os.mkdir(storage_folder)
@@ -311,19 +312,14 @@ def get_file(url):
     # verify checksum
     chksm = verify_checksum(data_f_name_temp, checksum)
     if chksm: # successful verification
-        log('Checksum verified successfully, storing ' + data_f_name)
+        log(f'Checksum verified successfully, storing {data_f_name}')
         
         # save checksume file
-        try:
-            f = open(checksum_f_name, 'w')  # overwrites if file already exists
-        except:
-            f = open(checksum_f_name, 'a')  # creates file if doesn't exist
-        f.write(checksum)
-        f.write(' ' + secure_filename(datafile.filename) + '\n')
-        f.close()
+        with open(checksum_f_name, 'w') as f:
+            f.write(f'{checksum} {secure_filename(datafile.filename)}\n')
 
         # remove temp file
-        os.system('mv ' + data_f_name_temp + ' ' + data_f_name)
+        os.system(f'mv {data_f_name_temp} {data_f_name}')
 
         # return success code
         return '200'

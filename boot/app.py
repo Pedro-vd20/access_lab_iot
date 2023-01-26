@@ -1,7 +1,4 @@
 '''
-ACCESS Lab, hereby disclaims all copyright interest in the program “ACCESS IOT 
-Stations” (which collects air and climate data) written by Francesco Paparella, 
-Pedro Velasquez.
 
 Copyright (C) 2022 Francesco Paparella, Pedro Velasquez
 
@@ -27,71 +24,71 @@ import sys
 
 sys.path.append('/home/pi/')
 
-from packages.modules import *
+import packages.modules as modules
 
-##########
+#----------
 
-# go through a list of networks and remove duplicates
+'''
+iterate through a list of networks and returns list with no duplicates
+list elements must contained desired info inside "" (split will extract it)
+Sample ls input:
+    ['ESSID:"nyu"', 'ESSID:"eduroam", 'ESSID:"nyuadguest"']
+'''
 def filter_list(ls):
-    unique = {}
+    unique = set()
 
     for x in ls:
         # elements in list stored as ESSID:"network_name"
         x = x.split('"')[1].strip() # retrieve network name
         print(x)
         # hidden networks appear as \x00, ignore those
-        if '\\x00' not in x and unique.get(x, 1): # make sure x not in unique yet
-            unique[x] = 0 # add to unique
+        if '\\x00' not in x and x not in unique: # make sure x not in unique yet
+            unique.add(x) # add to unique
 
-    return list(unique.keys())
+    return list(unique)
 
-# create a wpa_supplicant file
+'''
+Creates the wpa_supplicant file for the pi to connect to wifi
+Supports connecting to password protected wifi and connecting to 
+    organization networks that require further username and password 
+    authentication
+'''
 def create_network_config(ssid, password, is_org, username=""):
-    # overwrite / create file
-    try:
-        f = open(PATH + 'networkconfig.txt', 'w')
-    except:
-        f = open(PATH + 'networkconfig.txt', 'a')
+    # create supplicant file
+    with open(os.path.join(modules.PATH, 'networkconfig.txt'), 'w') as f:
+        f.write('ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev\n' + \
+            'update_config=1\ncountry=AE\n\nnetwork={\n\tssid="' + f'{ssid}"\n')
 
+        # organization wifi requires to add username and password, not just password
+        if is_org:
+            f.write('\tproto=RSN\n\tkey_mgmt=WPA-EAP\n\teap=PEAP\n\tidentity="' + \
+                f'{username}"\n\tpassword="{password}"\n\tphase2="auth=' + \
+                'MSCHAPV2"\n\tpriority=1\n')
+        else:
+            f.write(f'\tpsk="{password}"\n\tscan_ssid=1\n')
+
+        f.write('}\n')
     
-    f.write('ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev\nupdate_config=1\ncountry=AE\n\n')
-
-    f.write('network={\n\tssid="')
-    f.write(ssid)
-    f.write('"\n')
-
-    if is_org:
-        f.write('\tproto=RSN\n\tkey_mgmt=WPA-EAP\n\teap=PEAP\n\tidentity="')
-        f.write(username)
-        f.write('"\n\tpassword="')
-        f.write(password)
-        f.write('"\n\tphase2="auth=MSCHAPV2"\n\tpriority=1\n')
-
-    else:
-        f.write('\tpsk="')
-        f.write(password)
-        f.write('"\n\tscan_ssid=1\n')
-
-    f.write('}\n')
-    f.close()
-
-
-
-##########
+#----------
 
 app = Flask(__name__)
 
-##########
+#----------
 
+'''
+Main page is a form requesting the user critical info about available wifi 
+    networks to connect to. 
+Before returning page, must scan all available wifi networks for the user to 
+    choose which to connect to and provide required info
+'''
 @app.route('/', methods=['GET'])
 def home():
-    log('User accessing wifi survey site')
+    modules.log('User accessing wifi survey site')
     
     # scan for available networks 
-    run('sudo iwlist wlan0 scan | grep ESSID > ' + PATH + 'networks.txt')
-    f = open(PATH + 'networks.txt', 'r')
-    options = f.readlines() # each network is saved as ESSID:"name"
-    f.close()
+    os.system(f'sudo iwlist wlan0 scan | grep ESSID > {os.join(modules.PATH, "networks.txt")}')
+    with open(os.path.join(modules.PATH, 'networks.txt'), 'r') as f:
+        options = f.readlines() # each network is saved as ESSID:"name"
     
     # filter out repeated networks
     options = filter_list(options)
@@ -99,20 +96,17 @@ def home():
     # if no networks available, handle error
     if len(options) == 0:
         # HANDLE ERROR
-        log('ERROR no networks found, informing user')
+        modules.log('ERROR no networks found, informing user')
         return render_template('no_networks.html')
 
     # print(type(txt))
 
     # collect possible error info
     # errors from phase 3 stored in network_diag.txt file, if any errors available
-    try:
-        f = open(PATH + 'network_diag.txt', 'r')
+    with open(os.path.join(modules.PATH, 'network_diag.txt'), 'r') as f:
         error_info = f.readline()
         error = error_info != ''
-    except:
-        error = False
-        error_info = ''
+
 
     '''
     1. Can't connect to network (no ip)
@@ -124,10 +118,15 @@ def home():
 
     return render_template('index.html', wifi_list=options, error=error, error_info=error_info)
 
-
+'''
+Stores the information the user inputs about their own network for the pi to 
+    connect to.
+Does some minor checking (passwords match)
+Collects user email
+Resets pi to attempt to use this info to connect to the wifi
+'''
 @app.route('/connect/', methods=['POST'])
 def handle_form():
-    print('here')
     # collect form data
     email = request.form['email']
     network = request.form['network']
@@ -139,35 +138,31 @@ def handle_form():
     # check matching passwords
     if (password != password_2):
         # write error into file
-        log('Passwords did not match, returning to form')
-        try:
-            f = open(PATH + 'network_diag.txt', 'w')
-        except:
-            f = open(PATH + 'network_diag.txt', 'a')
-        f.write('Passwords do not match')
-        f.close()
+        modules.log('Passwords did not match, returning to form')
+        with open(os.path.join(modules.PATH, 'network_diag.txt'), 'w') as f:
+            f.write('Passwords do not match')
 
         # ignore form input, redirect to main page with new error
         return redirect('/') 
 
-    log('Form received, attempting to connect to ' + network)
+    modules.log(f'Form received, attempting to connect to {network}')
 
     # store email for later
-    try:
-        f = open(PATH + 'email.txt', 'w')
-    except:
-        f = open(PATH + 'email.txt', 'a')
-    f.write(email)
+    with open(os.path.join(modules.PATH, 'email.txt'), 'w') as f:
+        f.write(email)
 
     # create network config file
     create_network_config(network, password, n_type, user)
 
-    write_state(3) # update state to network testing phase
+    modules.write_state(3) # update state to network testing phase
 
     # revert py into non-access point mode
-    run('python3 ' + PATH + 'setup.py')
+    os.system(f'python3 {os.path.join(modules.PATH, "setup.py")}')
 
     return render_template('testing_wifi.html')
+
+#----------
+
 
 app.run(host='192.168.4.1', port=3500)
 #app.run()
