@@ -1,14 +1,11 @@
-[comment]: <ACCESS Lab, hereby disclaims all copyright interest in the program “ACCESS IOT Stations” (which collects air and climate data) written by Francesco Paparella, Pedro Velasquez. Copyright (C) 2022 Francesco Paparella, Pedro Velasquez>
 
 # Access Lab Measurement Stations
 
-Version 1.0
-
-Version 2.0 will focus on implementing mongodb rather than storing files locally.
+Next version will implement and use MongoDB for a database, replacing the current files for data storage.
 
 ## Receiver
 
-The receiver is a Flask server waiting for the various Access Stations to authenticate themselves and send data collected in the form of JSON files. It also receives diagnostics from the stations. Additionally, it allows users to see the data collected by the station they're hosting. The receiver then acts as a middle-man, taking data from the stations and uploading them to a publicly available database.
+The receiver is a Flask server waiting for the various Access Stations to authenticate themselves and send data collected in the form of JSON files. It also checks data received for inconsistencies and damaged sensors. Additionally, it allows users to see the data collected by the station they're hosting. The receiver then acts as a middle-man, taking data from the stations and uploading them to a publicly available database.
 
 ### Dependencies
 
@@ -42,9 +39,9 @@ $ pip3 install pandas
 ```console
 ./
  |-- cert.pem
- |-- ids.json
  |-- key.pem
- |-- logs.txt
+ |-- ids.json
+ |-- diagnostics.py
  |-- read_station_data.py
  |-- receiver.py
  |-- received_files/
@@ -58,22 +55,32 @@ $ pip3 install pandas
  |-- diagnostics/
  |   |-- station0/
  |   |   |--
+ |   |-- station1/
+ |   |   |--
  |   </>
  |   |-- station<n>/
  |   |   |--
- | --
+ |-- logs/
+ |   |-- 2022_11.txt
+ |   </>
+ |   |-- <year>_<month>.txt
  |
 ```
 
 ### Related Files
 * `cert.pem`: self-signed certificate for the HTTPS connection.
 * `key.pem`: private key to go along with `cert.pem`.
-* `ids.json`: contains all PI ids, station number, and their registered email for server to check.
-* `logs.txt`: if non-existant, `receiver.py` will create it and write errors or important info on it.
-* `read_station_data.py`: module with methods to fetch all the data from a specific station.
+* `ids.json`: contains all PI ids, station number, associated sensors with that station, and their registered email for server to check.
+* `diagnostics.py`: (CURRENTLY ONLY PARTIAL IMPLEMENTATION) goes over all data sent by stations and checks for discrepancies.
+    * Sensor drift by comparing the difference between redundant sensor measurements (TO BE IMPLEMENTED).
+    * Check diagnostics information whenever sensors provide such.
+    * Check for missing sensor data (i.e a sensor no longer reporting anything)
+    * Report errors found in data (TO BE IMPLEMENTED).
+* `read_station_data.py`: module with methods to fetch all the data from a specific station. After moving to MongoDB, this file will be removed in favor of a more interactive website to fetch data.
 * `receiver.py`: flask server to receive data and diagnostic files, show users data collected, and upload information to the database.
 * `received_files/`: directory where flask server will save both sha256 checksums and data collected. Files from station `i` will be stored in the subdirectory `received_files/stationi`
 * `diagnostics/`: directory where server saves sha256 checksums and diagnostics collected. Files from station `i` will be stored in subdirectory `diagnostics/stationi`.
+* `logs/`: directory to store per-month logging informatino. Scripts will automatically create new files for new months.
 
 
 ### Setting up
@@ -133,7 +140,9 @@ Some operating systems have port 443 (HTTPS) reserved, thus to avoid any possibl
 
 This will run the app in development mode. This is not recommended as it is less stable. However, for the time being and for testing purposes, it will do.
 
-#### Receiver Subdirectories
+#### Receiver Paths and Webpages
+
+All sites unrelated to the station-server data sending are currently unimplemented.
 
 * `/`:  Presents users with a search bar to view their station's data. Currently unimplemented.
 * `/view/station<i>`: dynamic url to view each station. `<i>` is to be replaced by the station's number. Currently unimplemented.
@@ -141,15 +150,17 @@ This will run the app in development mode. This is not recommended as it is less
     
         a) allow the station to test if it's connected to the internet.
         b) map the user's email to a given station, allowing the user to find and view their station's data.
+        c) send the station's sensor config file to the main server.
+
 * `/upload/`: stations contact this subdirectory to request an upload channel. The receiver will authenticate the station using the hexadecimal ids and return a random string.
 * `/upload/<rand_str>`: temporary subdirectorys created to upload files. The server performs integrity tests (sha256 checksums) before accepting files sent here.
 
 #### Response Codes
 
-The receiver will respond with any of the following codes:
+The receiver will respond with any of the following codes to the stations:
 
-* `200`: request successful, files received and verified.
-* `301 new_url`: the request was received successfully and the file should be sent to `/upload/new_url`.
+* `200`: request successful, files received and checksum verified.
+* `301 new_url`: the request to send a file was received successfully and the file should be sent to `/upload/new_url`.
 * `401`: unathorized request. The server will ignore the request.
 * `412`: precondition failed, files/headers necessary not sent in request.
 * `415`: unsopported file type received, request rejected.
@@ -181,7 +192,7 @@ The access stations are running
     
 * Python 3.9.2
 * pip3 20.0.2
-* Raspbian GNU/Linux 11 (bullseye)
+* Raspbian GNU/Linux 11 (Bullseye)
 
 Python dependencies
 * Flask 2.1.2
@@ -205,12 +216,12 @@ Other dependencies
  |-- boot/
  |   |-- app.py
  |   |-- dependencies.py
- |   |-- modules.py
  |   |-- setup.py
  |   |-- state.txt
  |   |-- services/
  |   |   |-- flask_app.service
  |   |   |-- setup.service 
+ |   |   |-- diagnostics.service
  |   |-- static/
  |   |   |-- app.js
  |   |   |-- styles.css
@@ -224,13 +235,17 @@ Other dependencies
  |-- cert.pem
  |-- data_collection.py
  |-- diagnostics.py
- |-- modules.py
  |-- sender.py
  |-- sensors.py 
  |-- station_id.py
+ |-- station.config
  |-- test.py
  |-- logs/
  |   |--
+ |-- data_logs/
+ |   |--
+ |-- packages/
+ |   |-- modules.py
  |-- sent_files/
  |   |--
  |--
@@ -242,14 +257,14 @@ All files inside the boot folder will setup the Access Station.
 
 * `boot/app.py`: small flask server whos only purpose is to collect the wifi information from the user in order to connect.
 * `boot/dependencies.py`: Installs all necessary dependencies and moves necessary services to `/lib/systemd/system/`.
-* `boot/modules.py`: shared code and constants imported by other python files.
 * `boot/setup.py`: main driver for setting up the access stations. Checks the current state of the machine and continues with next steps by running other files / executing commands.
 * `boot/state.txt`: stores the current state of the station. If the file is non-existant, the state is assumed as 0. States can range from 0 to 5.
 * `boot/services/*`: system services to automatically run the setup and the flask app each time the station boots.
 * `boot/static/*`: resources for the flask app such as images, stylesheets, and javascript code.
 * `boot/templates/*`: html pages for the flask app to render.
 * `sent_files/`: folder to store successfully sent files.
-* `logs/`: stores data collected
+* `logs/`: stores logging info of data collected.
+* `data_logs/`: stores data and diagnostics files temporarily until sender can upload them to server.
 * `ACCESS_station_lib.py`: wrapper classes to connect and interact with the sensor's hardware.
 * `cert.pem`: self-signed certificate used by the server for https.
 * `data_collection.py`: collects information from the sensors every 10 minutes.
@@ -257,10 +272,20 @@ All files inside the boot folder will setup the Access Station.
 * `sensors.py`: initializes sensors, to be configured/modified depending on which sensors are connected where.
 * `station_id.py`: contains the Pi's unique 16-digit hexadecimal ID and the station number, must be set manually.
     
+    ```python
+        # sample contents of 'station_id.py'
         secret = '4820FA34CB9D873E'
         station_num = '3' # must be as string
+    ```
 
-* `test.py`: tests to see if all the connections to the hardware are working well.
+* `station.config`: json object detailing how many of each sensor connected to the station (not including GPS). This file is automatically created after running `test.py`. A sample can be seen below:
+    ```json
+    {
+        "particulate_matter": 2,
+        "air_sensor": 2
+    }
+    ```
+* `test.py`: tests to see if all the connections to the hardware are working well. Sets up the configuration file for the station.
 
 
 ### Setting Up
@@ -356,7 +381,7 @@ This guide will follow the steps from boot up to operation required to set up th
     
     `sensors.py` will then loop through the sensors created and assign an index to each. This is necessary for data_collection later and is done automatically.
 
-1. Run `test.py` to do a quick test of all the hardware. If the RPi reboots, the hardware testing was successful. It may take some time while sensors such as the GPS calibrate.
+1. Run `test.py` to do a quick test of all the hardware. If the software doesn't crash, the test was succesful.
 
 1. Start the setup mode.
     ```console
@@ -409,14 +434,14 @@ Sending data:
 
 ## The ACCESS Station library
 
-This library includes all the beseecher classes used to communicate with the various sensors. If adding new classes, be sure they all contain a .measure() method, which will return a JSON dictionary of the values measured as well as two additional key-value pairs: 
+This library includes a `Beseecher` class. All other beseecher classes (except GPS-related classes) inherit the attributes from this parent class. All child beseecher classes must overwrite the `.measure()` method, to provide the brand-specific commands to interrogate the sensor. This method must return a dictionary of `property: value` pairs, as well as two additional key-value pairs: 
 
 ```JSON
 "type": <brand>,
 "sensor": <data_being_measured> 
 ```
 
-Type will differentiate sensors that collect the same data but from different brands, while sensor describes the data being measured. This allows `data_collection.py` to treat all sensors as the same, and through these 2 fields separate the data into appropriate fields. Of these 2 keys, `type` is purely for the user and serves no purpose in the code, and thus is not strictly necessary, though highly recommended. `sensor` though is necessary. Additionally, each beseecher class needs variables containing the `type` and `sensor` information. This is in case an error occurs when interrogating sensors. Having these two class variables will allow the error handling to recover important diagnostic information.
+Type will differentiate sensors that collect the same data but from different brands, while sensor describes the data being measured. This allows `data_collection.py` to treat all sensors as the same, and through these 2 fields separate the data into appropriate fields. Of these 2 keys, `type` is purely for the user and serves no purpose in the code, and thus is not strictly necessary, though highly recommended. `sensor` though is necessary. Additionally, each beseecher class inherits variables containing the `type` and `sensor` information. This is in case an error occurs when interrogating sensors. Having these two class variables will allow the error handling to recover important diagnostic information. Lastly, all classes inherit `index` variable. This is assigned automatically by the code and makes sure that the multi-threaded sensor interrogation always places the same sensors in the same order.
 
 The exception to the rule is GPS. The code assumes each station has exactly 1 GPS sensor and the code treats it different to other sensors. It lacks the `type` and `sensor` keys and its data is collected separately from the other sensors in the data_collection loop.
 
@@ -500,3 +525,5 @@ The exception to the rule is GPS. The code assumes each station has exactly 1 GP
     }
 }
 ```
+
+In the sample data, the `sensor` attribute is concatenated with the `index` attribute to generate the final string added as unique identifier for that sensor.
