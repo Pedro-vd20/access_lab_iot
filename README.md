@@ -20,6 +20,7 @@ Python dependencies
 * numpy 1.22.4
 * pandas 0.25.3
 * ssl
+* pymongo 4.3.3
 
 #### Installation
 

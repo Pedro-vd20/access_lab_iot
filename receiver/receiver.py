@@ -61,6 +61,7 @@ def log(msg):
     year = now.year
     month = now.month
 
+    # change to database
     with open(f'logs/{year}_{month}.txt', 'a') as f:
         f.write(now.strftime('[%Y-%m-%d %H:%M:%S] '))
         f.write(f'{msg}\n')
@@ -91,6 +92,7 @@ def is_auth(pi_id):
         return False
 
     # load ids
+    # change to use database
     with open(PI_ID_F, 'r') as ids:
         data = json.load(ids)
     
