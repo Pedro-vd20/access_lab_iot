@@ -195,7 +195,7 @@ def main():
 
         # file name
         f_name = secure_filename(f'station{station.station_num}_{curr_date}T' + \
-            '{curr_time}Z.json')
+            f'{curr_time}Z.json')
         with open(os.path.join(modules.HOME, 'data_logs', f_name), 'w') as f:
             json.dump(data_to_save, f, indent=4)
 
