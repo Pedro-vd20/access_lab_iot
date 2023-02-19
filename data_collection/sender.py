@@ -76,7 +76,7 @@ def main(args):
         modules.log(f'{FOLDER} not a valid directory, stopping sender')
         return -1
 
-    dir_list = os.listdir(FOLDER)
+    dir_list = sorted(os.listdir(FOLDER))
     num_files = len(dir_list)
 
     # send authentication request to server
