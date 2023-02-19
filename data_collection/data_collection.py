@@ -98,7 +98,7 @@ def measure(sensor, sensor_type, index):
         modules.log(f'Error collecting info for {sensor_type}{index}, {sensor.TYPE}')
         write_diag(f'{sensor_type}{index}', str(e))
         #raise(e) # for testing right now, exception handling later
-        return # end method, nothing to add to global data_to_save
+        return None # end method, nothing to add to global data_to_save
 
     # check if there are any diagnostics to report
     if 'diagnostics' in data.keys():
@@ -111,6 +111,8 @@ def measure(sensor, sensor_type, index):
     lock.acquire()
     data_to_save[sensor_type][index] = data
     lock.release()
+
+    return None
 
 '''
 Counts all the sensors connected to the RPi
