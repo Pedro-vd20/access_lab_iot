@@ -65,6 +65,7 @@ def log(msg):
     year = now.year
     month = now.month
 
+    # change to db
     with open(f'logs/{year}_{month}.txt', 'a') as f:
         f.write(now.strftime('[%Y-%m-%d %H:%M:%S] '))
         f.write(f'{msg}\n')
@@ -95,6 +96,7 @@ def is_auth(pi_id):
         return False
 
     # load ids
+    # change to use db
     with open(PI_ID_F, 'r') as ids:
         data = json.load(ids)
     
@@ -204,6 +206,8 @@ def upload_to_mongodb(raw_json, station_num):
                                           "particulate_matter.type.1" : raw_json["particulate_matter"][1]["type"],
                                           "air_sensor.type.0": raw_json["air_sensor"][0]["type"],
                                           "air_sensor.type.1" : raw_json["air_sensor"][1]["type"]}})
+    
+    return ""
 
 #---------------------------------------------------------
 
@@ -257,8 +261,7 @@ def register():
         log('Required data not in request')    
         return '412'
 
-    # add email to database
-    # DB
+    # add email to db
     station_dir = register_email(auth, email)
 
     log('Email registered')
@@ -380,6 +383,8 @@ def get_file(url):
     # save data file
     datafile.save(data_f_name_temp)
     
+    upload_to_mongodb(raw_json, station_num)
+
     # verify checksum
     chksm = verify_checksum(data_f_name_temp, checksum)
     if chksm: # successful verification
