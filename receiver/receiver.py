@@ -42,6 +42,10 @@ from werkzeug.utils import secure_filename
 from random import choice
 from string import ascii_letters
 import json
+import pymongo # for safety and consistency, we should change to Flask-PyMongo 
+
+client = pymongo.MongoClient("mongodb://localhost:<port>/")
+stations_db = client["stations"]
 
 # only accept txt and sha256 files
 ALLOWED_EXTENSIONS = {'txt', 'json', 'csv'}
@@ -61,7 +65,6 @@ def log(msg):
     year = now.year
     month = now.month
 
-    # change to database
     with open(f'logs/{year}_{month}.txt', 'a') as f:
         f.write(now.strftime('[%Y-%m-%d %H:%M:%S] '))
         f.write(f'{msg}\n')
@@ -92,7 +95,6 @@ def is_auth(pi_id):
         return False
 
     # load ids
-    # change to use database
     with open(PI_ID_F, 'r') as ids:
         data = json.load(ids)
     
@@ -138,7 +140,70 @@ def get_date(file_str):
 
     return f'{year}_{month}'
 
+def get_month_from_datetime(date: str): #CHANGE THIS TO USE FILENAME
+    if date == None: 
+        return ""
+    return "{}_{}".format(date[5:7],date[0:4])
 
+def read_json(raw_json): 
+        gps = raw_json["date_time_position"]
+        particulate_matter = raw_json["particulate_matter"]
+        air_sensor = raw_json["air_sensor"]
+        sensor_types = [gps, particulate_matter, air_sensor] # it might make more sense to make this a dict.
+
+        # for extra in raw_json:
+        #     if extra != "particulate matter" and extra != "air_sensor" and extra != "date_time_position":
+        #         sensor_types.append(raw_json[extra])
+
+        return sensor_types
+
+
+def upload_to_mongodb(raw_json, station_num):
+    sensor_types = read_json(raw_json) 
+    month = get_month_from_datetime(sensor_types[0]["date"])
+    
+    station_col = stations_db["station"+station_num]
+    station_col.update_one({"month": month}, # specific template for consistency and testing/debugging, will be changed to for loop
+                           {"$push" : {"particulate_matter.PM1count.0" : raw_json["particulate_matter"][0]["PM1count"],
+                                    "particulate_matter.PM1count.1" : raw_json["particulate_matter"][1]["PM1count"],
+                                    "particulate_matter.PM2,5count.0" : raw_json["particulate_matter"][0]["PM2.5count"],
+                                    "particulate_matter.PM2,5count.1" : raw_json["particulate_matter"][1]["PM2.5count"],
+                                    "particulate_matter.PM10count.0" : raw_json["particulate_matter"][0]["PM10count"],
+                                    "particulate_matter.PM10count.1" : raw_json["particulate_matter"][1]["PM10count"],
+                                    "particulate_matter.PM1mass.0" : raw_json["particulate_matter"][0]["PM1mass"],
+                                    "particulate_matter.PM1mass.1" : raw_json["particulate_matter"][1]["PM1mass"],
+                                    "particulate_matter.PM2,5mass.0" : raw_json["particulate_matter"][0]["PM2,5mass"],
+                                    "particulate_matter.PM2,5mass.1" : raw_json["particulate_matter"][1]["PM2,5mass"],
+                                    "particulate_matter.PM10mass.0" : raw_json["particulate_matter"][0]["PM10mass"],
+                                    "particulate_matter.PM10mass.1" : raw_json["particulate_matter"][1]["PM10mass"],
+                                    "particulate_matter.sensor_T.0" : raw_json["particulate_matter"][0]["sensor_T"],
+                                    "particulate_matter.sensor_T.1" : raw_json["particulate_matter"][1]["sensor_T"],
+                                    "particulate_matter.sensor_RH.0" : raw_json["particulate_matter"][0]["sensor_RH"],
+                                    "particulate_matter.sensor_RH.1" : raw_json["particulate_matter"][1]["sensor_RH"],
+                                    "air_sensor.humidity.0" : raw_json["air_sensor"][0]["humidity"],
+                                    "air_sensor.humidity.1" : raw_json["air_sensor"][1]["humidity"],
+                                    "air_sensor.temperature.0" : raw_json["air_sensor"][0]["temperature"],
+                                    "air_sensor.temperature.1" : raw_json["air_sensor"][1]["temperature"],
+                                    "air_sensor.pressure.0" : raw_json["air_sensor"][0]["pressure"],
+                                    "air_sensor.pressure.1" : raw_json["air_sensor"][1]["pressure"],
+                                    "gps.datetime" : (raw_json["date_time_position"]["date"] + "T" + raw_json["date_time_position"]["time"] + "Z"),
+                                    "gps.date" : raw_json["date_time_position"]["date"],
+                                    "gps.time" : raw_json["date_time_position"]["time"],
+                                    "gps.latitude" : raw_json["date_time_position"]["latitude"],
+                                    "gps.lat_dir" : raw_json["date_time_position"]["lat_dir"],
+                                    "gps.longitude" : raw_json["date_time_position"]["longitude"],
+                                    "gps.lon_dir" : raw_json["date_time_position"]["lon_dir"],
+                                    "gps.altitude" : raw_json["date_time_position"]["altitude"],
+                                    "gps.alt_unit" : raw_json["date_time_position"]["alt_unit"],
+                                    "gps.num_sats" : raw_json["date_time_position"]["num_sats"],
+                                    "gps.PDOP" : raw_json["date_time_position"]["PDOP"],
+                                    "gps.HDOP" : raw_json["date_time_position"]["HDOP"],
+                                    "gps.VDOP" : raw_json["date_time_position"]["VDOP"]
+                                    },
+                                    "$set" : {"particulate_matter.type.0" : raw_json["particulate_matter"][0]["type"],
+                                          "particulate_matter.type.1" : raw_json["particulate_matter"][1]["type"],
+                                          "air_sensor.type.0": raw_json["air_sensor"][0]["type"],
+                                          "air_sensor.type.1" : raw_json["air_sensor"][1]["type"]}})
 
 #---------------------------------------------------------
 
@@ -193,7 +258,9 @@ def register():
         return '412'
 
     # add email to database
+    # DB
     station_dir = register_email(auth, email)
+
     log('Email registered')
 
     # save config file
@@ -211,6 +278,7 @@ def register():
         return '415'
 
     # save data and validate checksum
+    # add to DB
     datafile.save(f'{station_dir}sensors_config.txt')
     if not verify_checksum(f'{station_dir}sensors_config.txt', checksum):
         # remove file
@@ -222,7 +290,7 @@ def register():
         
 
 # authentication route
-# verifies id sent by pi
+# verifies id sent by pi 
 # if authenticated, returns route to upload files
 @app.route('/upload/', methods=['GET'])
 def authenticate():
@@ -277,6 +345,7 @@ def get_file(url):
         return '412'
 
     # collect files
+    raw_json = request.get_json()
     datafile = request.files['sensor_data_file']
     checksum = request.headers['checksum']
     station_num = request.headers['pi_num']
@@ -333,3 +402,4 @@ def get_file(url):
 
         # return error
         return '500'
+    
