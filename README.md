@@ -263,7 +263,7 @@ All files inside the boot folder will setup the Access Station.
 * `boot/services/*`: system services to automatically run the setup and the flask app each time the station boots.
 * `boot/static/*`: resources for the flask app such as images, stylesheets, and javascript code.
 * `boot/templates/*`: html pages for the flask app to render.
-* `sent_files/`: folder to store successfully sent files.
+* `sent_files/`: folder to store successfully sent files. Files here are stored by month collected in subdirectories.
 * `logs/`: stores logging info of data collected.
 * `data_logs/`: stores data and diagnostics files temporarily until sender can upload them to server.
 * `ACCESS_station_lib.py`: wrapper classes to connect and interact with the sensor's hardware.
@@ -446,6 +446,8 @@ Type will differentiate sensors that collect the same data but from different br
 
 The exception to the rule is GPS. The code assumes each station has exactly 1 GPS sensor and the code treats it different to other sensors. It lacks the `type` and `sensor` keys and its data is collected separately from the other sensors in the data_collection loop.
 
+Make sure no `property: value` pair has any `.` in the property name. Mongo uses `.` for queries and this would interfere with the database.
+
 ### Sample Data
 
 ```json
@@ -453,10 +455,10 @@ The exception to the rule is GPS. The code assumes each station has exactly 1 GP
     "particulate_matter": [
         {
             "PM1count": 174,
-            "PM2.5count": 175,
+            "PM2,5count": 175,
             "PM10count": 176,
             "PM1mass": 12.8,
-            "PM2.5mass": 20.8,
+            "PM2,5mass": 20.8,
             "PM10mass": 40.4,
             "sensor_T": 36.15,
             "sensor_RH": 66.22,
@@ -474,10 +476,10 @@ The exception to the rule is GPS. The code assumes each station has exactly 1 GP
         },
         {
             "PM1count": 176,
-            "PM2.5count": 178,
+            "PM2,5count": 178,
             "PM10count": 178,
             "PM1mass": 12.6,
-            "PM2.5mass": 20.6,
+            "PM2,5mass": 20.6,
             "PM10mass": 43.7,
             "sensor_T": 36.0,
             "sensor_RH": 66.01,
@@ -527,4 +529,4 @@ The exception to the rule is GPS. The code assumes each station has exactly 1 GP
 }
 ```
 
-In the sample data, the `sensor` attribute is concatenated with the `index` attribute to generate the final string added as unique identifier for that sensor.
+In the sample data, the `sensor` attribute is concatenated with the `index` attribute to generate the final string added as unique identifier for that sensor. It is also **IMPORTANT** to note that NO key can contain `.`, as Mongo uses `.` for queries. Instead, entries like `PM2.5count` have been updated to `PM2,5count`. 
