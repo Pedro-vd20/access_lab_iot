@@ -236,6 +236,11 @@ class GPSbeseecherGPIO:
 #       If there are multiple sensors of the same .SENSOR attribute, this 
 #       differentiates them at the time of data collection
 #       The index attribute is assigned automatically by the sensors.py file
+#
+# When creating the measure method, make sure NONE of the keys in the 
+# dictionary returned contain ".". Mongo uses "." for queries and thus keys 
+# containing "." such as "PM2.5count" in the NEXTPMBeseecher must be written
+# as "PM2,5count" instead
 
 class Beseecher:
     def __init__(self, sensor, sens_type, index=0):
@@ -455,10 +460,10 @@ class NEXTPMbeseecher(Beseecher):
             "type": self.TYPE,
             "sensor": f'{self.SENSOR}{self.index}',
             'PM1count':   int.from_bytes(res[3:5], 'big'),
-            'PM2.5count': int.from_bytes(res[5:7], 'big'),
+            'PM2,5count': int.from_bytes(res[5:7], 'big'),
             'PM10count':  int.from_bytes(res[7:9], 'big'),
             'PM1mass':    round(0.1*int.from_bytes(res[9:11], 'big'), 1),
-            'PM2.5mass':  round(0.1*int.from_bytes(res[11:13], 'big'), 1),
+            'PM2,5mass':  round(0.1*int.from_bytes(res[11:13], 'big'), 1),
             'PM10mass':   round(0.1*int.from_bytes(res[13:15], 'big'), 1),
             'sensor_T':   round(T, 2),
             'sensor_RH':  round(RH, 2),
@@ -713,13 +718,13 @@ an auto-cleaning interval may also be specified (defaults to 1 day).
     """
     #Translations from the sps30 class data dictionary keynames to our keynames.
     tr_mass  = {'pm1.0':  'PM1mass',
-                'pm2.5':  'PM2.5mass',
+                'pm2.5':  'PM2,5mass',
                 'pm4.0':  'PM4mass',
                 'pm10': 'PM10mass',
                 }
-    tr_count = {'pm0.5':  'PM0.5count',
+    tr_count = {'pm0.5':  'PM0,5count',
                 'pm1.0':  'PM1count',
-                'pm2.5':  'PM2.5count',
+                'pm2.5':  'PM2,5count',
                 'pm4.0':  'PM4count',
                 'pm10': 'PM10count',}
     tr_diag =  {'fan_status':   'Fan_error',

@@ -56,6 +56,21 @@ except ModuleNotFoundError:
     # SENDER WILL NOT HAVE CHECKSUM FILES BUT RECEIVER SHOULD STILL STORE THEM
 '''
 
+##########
+
+'''
+Data files sent all contain date info
+The file name is station<n>_YYYY-MM-DDT<...>Z.json
+Collect the YYYY-MM and return as string
+'''
+def collect_date(f_name):
+    date = f_name.split('/')[-1].split('_')[1].split('-') # collect [YYYY, MM, ...]
+
+    return f'{date[0]}-{date[1]}'
+
+##########
+
+
 # URL = 'http://10.224.83.51:5000'
 # FOLDER = '/home/pi/data_logs/'
 # DEST_FOLDER = '/home/pi/sent_files/'
@@ -128,8 +143,16 @@ def main(args):
 
         # check if success
         if (rsp == '200'):
+            # collect month / year of file sent
+            date = collect_date(send_file)
+            file_dest = os.path.join(DEST_FOLDER, date)
+
+            # check if dest folder exists
+            if not os.path.isdir(file_dest):
+                os.system(f'mkdir {file_dest}')
+
             # move file to sent folder
-            os.system(f'mv {os.path.join(FOLDER, send_file)} {DEST_FOLDER}')
+            os.system(f'mv {os.path.join(FOLDER, send_file)} {file_dest}')
             modules.log(f'{send_file} sent')
         else:
             modules.log(f'{send_file} could not be sent')
