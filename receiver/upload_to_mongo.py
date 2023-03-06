@@ -19,8 +19,11 @@ You should have received a copy of the GNU General Public License along with
 '''
 
 '''
-This file will go through a list of existing data files that have never been 
+This file will go through a list of existing data files that have NEVER been 
 uploaded to the mongo server and will upload them all in order
+
+receiver.py should have the task of regularly updating to mongo, this script 
+is for single use to migrate the old files to the new Mongo implementation
 
 Expected folder structure:
 ./received_files/
