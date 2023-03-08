@@ -1,7 +1,7 @@
 
 # Access Lab Measurement Stations
 
-Next version will implement and use MongoDB for a database, replacing the current files for data storage.
+Version 2.0.0 Now running Mongo! This version is currently unstable and in the process of testing all mongo interactions. Major code rewrites are under testing and thus this version is unstable.
 
 ## Receiver
 
@@ -33,6 +33,7 @@ $
 $ pip3 install Flask
 $ pip3 install numpy
 $ pip3 install pandas
+$ pip3 install pymongo
 ```
 
 ### Folder Structure
@@ -45,6 +46,9 @@ $ pip3 install pandas
  |-- diagnostics.py
  |-- read_station_data.py
  |-- receiver.py
+ |-- modules/
+ |   |-- files.py
+ |   |-- mongo.py
  |-- received_files/
  |   |-- station0/
  |   |   |--
@@ -79,6 +83,8 @@ $ pip3 install pandas
     * Report errors found in data (TO BE IMPLEMENTED).
 * `read_station_data.py`: module with methods to fetch all the data from a specific station. After moving to MongoDB, this file will be removed in favor of a more interactive website to fetch data.
 * `receiver.py`: flask server to receive data and diagnostic files, show users data collected, and upload information to the database.
+* `modules/files.py`: methods centered around files and directories that receiver and mongo need.
+* `modules/mongo.py`: Mongo class to handle all communiocation with the MongoDB database, including all data updates and info reading.  
 * `received_files/`: directory where flask server will save both sha256 checksums and data collected. Files from station `i` will be stored in the subdirectory `received_files/stationi`
 * `diagnostics/`: directory where server saves sha256 checksums and diagnostics collected. Files from station `i` will be stored in subdirectory `diagnostics/stationi`.
 * `logs/`: directory to store per-month logging informatino. Scripts will automatically create new files for new months.
@@ -182,6 +188,119 @@ The rest of the errors assume successful validation of the station.
 * `Wrong checksum`: the checksum sent does not match the sent file. The file is not downloaded and the request is ignored.
 
 ___
+
+## MongoDB
+
+This section will cover all the different collections and data layouts for our mongo database.
+
+### Database
+
+All information stored by this project will be housed in a database called `stations`.
+
+### Collections
+
+The database will house two kinds of collections: those that store station data and one that stores administrative data.
+
+Each station will have its own collection to store its data, `db["station<n>"]` for the n<sup>th</sup> station. In it, every station will have a config document, identified by the key-value pair `{"config": true}`. The other documents are all separated by month and include data collected by that station. Examples of both will be provided below.
+
+The `db["stations_info"]` collection will contain copies of all the configuration documents of all stations in one centralized collection.
+
+### Sample Documents
+
+Below is a sample configuration document. Recalll the `id` is a unique hexadecimal string that identifies each station. Stations marked as stationary have a fixed location while non-stationary may be mounted on a moving vehicle.
+```json
+{
+    "config": true,
+    "sensors": {
+        "particulate_matter": 2,
+        "air_sensor": 2,
+        "gps": 1
+    },
+    "id": 0x0000000000000000,
+    "email": "youremail@sample.com",
+    "stationary": true,
+    "station_num": 3
+}
+```
+
+Below is a sample data document based on the one found at the end of the documentation. There are differences in how mongo and the files will be stored. They are designed for people to request entire bulks of monthly data. All arrays act as parallel arrays, allowing for ease of plotting. All months follow the naming convention `MM_YYYY`. All fields stored in arrays act as a timeseries for that month, with new entries appended to the end. To differentiate between multiple sensors, each sensor in a station is mapped to its respective index (i.e "0" or "1" in this case since there are 2 of each sensor). 
+
+```json
+{
+    "month": "07_2022",
+    "particulate_matter": {
+        "PM1count": {
+            "0": [174],
+            "1": [176]
+        },
+        "PM2,5count": {
+            "0": [175],
+            "1": [178]
+        },
+        "PM10count": {
+            "0": [176],
+            "1": [178]
+        },
+        "PM1mass": {
+            "0": [12.8],
+            "1": [12.6]
+        },
+        "PM2,5mass": {
+            "0": [20.8],
+            "1": [20.6]
+        },
+        "PM10mass": {
+            "0": [40.4],
+            "1": [43.7]
+        },
+        "sensor_T": {
+            "0": [36.15],
+            "1": [36.0]
+        },
+        "sensor_RH": {
+            "0": [66.22],
+            "1": [66.01]
+        },
+        "type": {
+            "0": "nextpm",
+            "1": "nextpm"
+        }
+    },
+    "air_sensor": {
+        "type": {
+            "0": "bme280",
+            "1": "ms8607"
+        },
+        "humidity": {
+            "0": [63.82468880562936],
+            "1": [64.14846801757812]
+        },
+        "temperature": {
+            "0": [35.023828125],
+            "1": [35.04]
+        },
+        "pressure": {
+            "0": [994.0989164570198],
+            "1": [993.72]
+        }
+    },
+    "gps": {
+        "datetime": [ISODate("2023-03-07T16:52:06Z")],
+        "position": [[54.432657166666665, 24.524455833333334]],
+        "lat_dir": ["N"],
+        "lon_dir": ["E"],
+        "altitude": [-30.9],
+        "alt_unit": "M",
+        "num_sats": [6],
+        "PDOP": [2.99],
+        "HDOP": [1.65],
+        "VDOP": [2.5]
+    }
+}
+```
+
+
+
 
 ## Access Stations
 
