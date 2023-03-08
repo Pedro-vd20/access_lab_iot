@@ -1,7 +1,7 @@
 import pymongo
 import os
 import datetime
-from files import STORAGE_FOLDER, DIAGNOSTICS
+from modules.files import STORAGE_FOLDER, DIAGNOSTICS
 
 
 '''
