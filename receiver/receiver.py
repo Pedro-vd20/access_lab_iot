@@ -1,410 +1,327 @@
+import os
+import datetime
+from flask import Flask, request
+from werkzeug.utils import secure_filename
+from werkzeug.datastructures import FileStorage
+from random import choice
+from string import ascii_letters
+from pymongo.errors import ConnectionFailure
+# for safety and consistency, we should change to Flask-PyMongo
+import modules.files as files
+import modules.mongo as mongo
+
 '''
 
 Copyright (C) 2022 Francesco Paparella, Pedro Velasquez
 
 This file is part of "ACCESS IOT Stations".
 
-"ACCESS IOT Stations" is free software: you can redistribute it and/or modify it under the 
-terms of the GNU General Public License as published by the Free Software 
-Foundation, either version 3 of the License, or (at your option) any later 
-version.
+"ACCESS IOT Stations" is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by the Free
+Software Foundation, either version 3 of the License, or (at your option) any
+later version.
 
-"ACCESS IOT Stations" is distributed in the hope that it will be useful, but WITHOUT ANY 
-WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR 
-A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+"ACCESS IOT Stations" is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more
+details.
 
-You should have received a copy of the GNU General Public License along with 
+You should have received a copy of the GNU General Public License along with
 "ACCESS IOT Stations". If not, see <https://www.gnu.org/licenses/>.
 
 '''
 
-"""
+'''
 From https://flask.palletsprojects.com/en/2.0.x/patterns/fileuploads/
 with modifications.
 
 One can upload a file with curl using the command line:
 
-curl -F 'sensor_data_file=@<filename.txt>' -F 'checksum=@<chechsumfilename.sha256>' <web page address>
+curl -F 'sensor_data_file=@<filename.txt>' -F
+    'checksum=@<chechsumfilename.sha256>' <web page address>
 
-where: 
+where:
 <filename> is the name of the file to be uploaded.
-<chechsumfilename> is the name of the textfile produced by running sha256sum 
-                   in binary mode on <filename.txt> 
+<chechsumfilename> is the name of the textfile produced by running sha256sum
+                   in binary mode on <filename.txt>
                    (e.g.: sha256sum -b pippo.txt > pippo.sha256).
 <web page address> is the url of the upload page, e.g. http://127.0.0.1:5000/
-"""
+'''
 
-import os
-import hashlib
-import datetime
-from flask import Flask, request
-from werkzeug.utils import secure_filename
-from random import choice
-from string import ascii_letters
-import json
-import pymongo # for safety and consistency, we should change to Flask-PyMongo 
 
-client = pymongo.MongoClient("mongodb://localhost:<port>/")
-stations_db = client["stations"]
+##########
 
-# only accept txt and sha256 files
-ALLOWED_EXTENSIONS = {'txt', 'json', 'csv'}
-# place to permanently store files
-STORAGE_FOLDER = '/home/pv850/received_files/'
-DIAGNOSTICS = '/home/pv850/diagnostics/'
-# place where all pi ids are stored
-PI_ID_F = 'ids.json'
+# constants definitions
+
 # how long urls will be
 URL_LEN = 20
+# mongo connection info
+MONGO_ADDR = 'localhost'
+MONGO_PORT = 27017
+DATABASE = 'stations'
 
-#---------------------------------------------------------
+##########
 
-def log(msg):
+# global variable definitions
+urls = mongodb = None
+
+
+def log(msg: str) -> None:
+    '''
+    Write any logging information into the appropriate log file
+    Log files are separated by month
+    @param msg message to write
+    '''
+
     # get current time
-    now = datetime.datetime.now() 
+    now = datetime.datetime.now()
     year = now.year
     month = now.month
 
     # change to db
-    with open(f'logs/{year}_{month}.txt', 'a') as f:
+    with open(f'logs/{year}_{month}.txt', 'a', encoding='utf-8') as f:
         f.write(now.strftime('[%Y-%m-%d %H:%M:%S] '))
         f.write(f'{msg}\n')
 
 
-# check file extension for validity
-def allowed_file(filename):
-    return '.' in filename and \
-           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+def gen_rand_string(length: int = URL_LEN) -> str:
+    '''
+    Generate a unique random string of specified length
+    @param length defaults to URL_LEN constant
+    '''
+    rand_str = ''.join([choice(ascii_letters) for i in range(length)])
+
+    # make sure rand_str is unique
+    global urls
+    while urls.get(rand_str, None) is not None:
+        rand_str = ''.join([choice(ascii_letters) for i in range(length)])
+
+    return urls
 
 
-# check the checksum of a file
-def verify_checksum(fname, chksm):
-    # check file validity
-    if not os.path.isfile(fname):
-        return False
-    
-    with open(fname, 'rb') as f:
-        hash_256 = hashlib.sha256(f.read()).hexdigest()
-    
-    return hash_256 == chksm
+def init_data():
+    '''
+    Check if all necessary dependencies are working
+    These are: mongo, storage folder, and diagnostics folder
+    '''
+
+    # check folders
+    if not (os.path.isdir(files.STORAGE_FOLDER) and
+            os.path.isdir(files.DIAGNOSTICS)):
+        log('Error finding folders')
+        raise NotADirectoryError(f'Missing {files.STORAGE_FOLDER} or ' +
+                                 'f{files.DIAGNOSTICS}')
+
+    # check mongo
+    if not mongodb.test_connection():
+        log('Error connecting to mongodb')
+        raise ConnectionFailure
 
 
-# verify a pi's id
-def is_auth(pi_id):
-    # check for empty arg
-    if pi_id == '':
-        return False
+def authenticate_request(pi_id: str,
+                         headers: list,
+                         check_files: bool = False,
+                         rqs_file: FileStorage = None) -> str:
+    '''
+    Checks that all the passed arguments not none and are present in the
+    request
+    @param pi_id hex string to pass to mongo for verification
+    @param headers list of headers to check the values of
+    @param check_files boolean to indicate files where passed for checking
+    @param rqs_file if request passes files, also check those. These need to
+        be checked for accepted data types as well
+    @return appropriate error code if error is encountered, empty string if
+        everything is okay
+    '''
 
-    # load ids
-    # change to use db
-    with open(PI_ID_F, 'r') as ids:
-        data = json.load(ids)
-    
+    # check pi_id
+    if pi_id is None or (not mongodb.is_auth(pi_id)):
+        log('Unauthorized access, rejected')
+        return '401'
 
-    auth = data.get(pi_id, None)
-    return auth != None
-    
+    # check headers and files for None
+    for header in headers:
+        if headers is None:
+            log('Required data not in request')
+            return '412'
 
-# generate random string
-def gen_rand_string():
-    return ''.join([choice(ascii_letters) for i in range(URL_LEN)])
+    # early return if no files to check
+    if not check_files:
+        return ''
 
-# add an email to a station
-def register_email(auth, email):
-    # load data
-    with open(PI_ID_F, 'r') as ids:
-        data = json.load(ids)
+    # Checking file
 
-    # add email
-    data[auth]['email'] = email
-    # get station num
-    num = data[auth]['station_num']
+    # check empty file name
+    if rqs_file.filename == '':
+        log('Empty file or checksum fields')
+        return '412'
 
-    # save info
-    with open(PI_ID_F, 'w') as ids:
-        json.dump(data, ids, indent=4)
+    # check for supported file type
+    elif not files.allowed_file(rqs_file.filename):
+        log('Unsupported file type')
+        return '415'
 
-    # create folder for this station
-    os.system(f'mkdir {STORAGE_FOLDER}station{num}')
-    os.system(f'mkdir {DIAGNOSTICS}station{num}')
-
-    return f'{STORAGE_FOLDER}station{num}'
-    
-
-'''
-Collect the date from a given filename
-Files are written station<num>_<year>-<month>-<day>T<hour>Z.json
-'''
-def get_date(file_str):
-    date = file_str.split('_')[1].split('-')
-    year = date[0]
-    month = date[1]
-
-    return f'{year}_{month}'
-
-def get_month_from_datetime(date: str): #CHANGE THIS TO USE FILENAME
-    if date == None: 
-        return ""
-    return "{}_{}".format(date[5:7],date[0:4])
-
-def read_json(raw_json): 
-        gps = raw_json["date_time_position"]
-        particulate_matter = raw_json["particulate_matter"]
-        air_sensor = raw_json["air_sensor"]
-        sensor_types = [gps, particulate_matter, air_sensor] # it might make more sense to make this a dict.
-
-        # for extra in raw_json:
-        #     if extra != "particulate matter" and extra != "air_sensor" and extra != "date_time_position":
-        #         sensor_types.append(raw_json[extra])
-
-        return sensor_types
+    # all tests passed, return empty string
+    return ''
 
 
-def upload_to_mongodb(raw_json, station_num):
-    sensor_types = read_json(raw_json) 
-    month = get_month_from_datetime(sensor_types[0]["date"])
-    
-    station_col = stations_db["station"+station_num]
-    station_col.update_one({"month": month}, # specific template for consistency and testing/debugging, will be changed to for loop
-                           {"$push" : {"particulate_matter.PM1count.0" : raw_json["particulate_matter"][0]["PM1count"],
-                                    "particulate_matter.PM1count.1" : raw_json["particulate_matter"][1]["PM1count"],
-                                    "particulate_matter.PM2,5count.0" : raw_json["particulate_matter"][0]["PM2.5count"],
-                                    "particulate_matter.PM2,5count.1" : raw_json["particulate_matter"][1]["PM2.5count"],
-                                    "particulate_matter.PM10count.0" : raw_json["particulate_matter"][0]["PM10count"],
-                                    "particulate_matter.PM10count.1" : raw_json["particulate_matter"][1]["PM10count"],
-                                    "particulate_matter.PM1mass.0" : raw_json["particulate_matter"][0]["PM1mass"],
-                                    "particulate_matter.PM1mass.1" : raw_json["particulate_matter"][1]["PM1mass"],
-                                    "particulate_matter.PM2,5mass.0" : raw_json["particulate_matter"][0]["PM2.5mass"],
-                                    "particulate_matter.PM2,5mass.1" : raw_json["particulate_matter"][1]["PM2.5mass"],
-                                    "particulate_matter.PM10mass.0" : raw_json["particulate_matter"][0]["PM10mass"],
-                                    "particulate_matter.PM10mass.1" : raw_json["particulate_matter"][1]["PM10mass"],
-                                    "particulate_matter.sensor_T.0" : raw_json["particulate_matter"][0]["sensor_T"],
-                                    "particulate_matter.sensor_T.1" : raw_json["particulate_matter"][1]["sensor_T"],
-                                    "particulate_matter.sensor_RH.0" : raw_json["particulate_matter"][0]["sensor_RH"],
-                                    "particulate_matter.sensor_RH.1" : raw_json["particulate_matter"][1]["sensor_RH"],
-                                    "air_sensor.humidity.0" : raw_json["air_sensor"][0]["humidity"],
-                                    "air_sensor.humidity.1" : raw_json["air_sensor"][1]["humidity"],
-                                    "air_sensor.temperature.0" : raw_json["air_sensor"][0]["temperature"],
-                                    "air_sensor.temperature.1" : raw_json["air_sensor"][1]["temperature"],
-                                    "air_sensor.pressure.0" : raw_json["air_sensor"][0]["pressure"],
-                                    "air_sensor.pressure.1" : raw_json["air_sensor"][1]["pressure"],
-                                    "gps.datetime" : (raw_json["date_time_position"]["date"] + "T" + raw_json["date_time_position"]["time"] + "Z"),
-                                    "gps.date" : raw_json["date_time_position"]["date"],
-                                    "gps.time" : raw_json["date_time_position"]["time"],
-                                    "gps.latitude" : raw_json["date_time_position"]["latitude"],
-                                    "gps.lat_dir" : raw_json["date_time_position"]["lat_dir"],
-                                    "gps.longitude" : raw_json["date_time_position"]["longitude"],
-                                    "gps.lon_dir" : raw_json["date_time_position"]["lon_dir"],
-                                    "gps.altitude" : raw_json["date_time_position"]["altitude"],
-                                    "gps.alt_unit" : raw_json["date_time_position"]["alt_unit"],
-                                    "gps.num_sats" : raw_json["date_time_position"]["num_sats"],
-                                    "gps.PDOP" : raw_json["date_time_position"]["PDOP"],
-                                    "gps.HDOP" : raw_json["date_time_position"]["HDOP"],
-                                    "gps.VDOP" : raw_json["date_time_position"]["VDOP"]
-                                    },
-                                    "$set" : {"particulate_matter.type.0" : raw_json["particulate_matter"][0]["type"],
-                                          "particulate_matter.type.1" : raw_json["particulate_matter"][1]["type"],
-                                          "air_sensor.type.0": raw_json["air_sensor"][0]["type"],
-                                          "air_sensor.type.1" : raw_json["air_sensor"][1]["type"]}})
-    
-    return ""
-
-#---------------------------------------------------------
-
-# make sure the necessary paths are available
-if not (os.path.isfile(PI_ID_F) and \
-  os.path.isdir(STORAGE_FOLDER) and \
-  os.path.isdir(DIAGNOSTICS)):
-    log('Error finding files and folders')
-    raise(FileNotFoundError('Missing files and folders'))
-
+##########
 
 # dictionary to keep mapping of random urls to pi ids
 urls = {}
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = '1234567'
-app.config['MAX_CONTENT_LENGTH'] = 1024 * 128 # max file size (in KB)
-app.config['STORAGE_FOLDER'] = STORAGE_FOLDER
+app.config['MAX_CONTENT_LENGTH'] = 1024 * 128  # max file size (in KB)
+
+mongodb = mongo.Mongo(MONGO_ADDR, MONGO_PORT, DATABASE)
+
+# check if all necessary folders / connections work
+init_data()
+
 
 log('Server running')
 
-#---------------------------------------------------------
+##########
 
-# page for users to request their access station
+
 @app.route('/', methods=['GET'])
-def home():
+def home() -> str:
+    '''
+    Home page for users to search for info regarding different stations
+    Should have a search bar to explore the data from various stations
+    '''
     return 'Temporarily out of order'
 
-# page to display access station data
+
 @app.route('/view/<station>')
-def view_station(station):
+def view_station(station: str) -> str:
+    '''
+    Display page for users to plot and explore data from different stations
+    @param station string in the form "station<n>"
+    '''
     return 'Temporarily out of order'
 
-# page to register new access station to system
-# adds user email to database so they can check their station
+
 @app.route('/register/', methods=['POST'])
-def register():
+def register() -> str:
+    '''
+    Route to register a new station
+    Stations call this route when they first connect to the internet when first
+    deployed
+    This route needs to add a user's email to the database as well as the
+    sensors config file which will be in the request
+    '''
     # collect headers
     auth = request.headers.get('pi_id', None)
     email = request.headers.get('email', None)
+    checksum = request.headers.get('checksum', None)
+    datafile = request.files.get('sensor_config', None)
 
-    # if id doesn't match
-    if (auth == None) or (not is_auth(auth)):
-        log('Unauthorized access, rejected')
-        return '401'
-
-    # Missing data
-    if email == None or 'sensor_config' not in request.files or \
-        'checksum' not in request.headers:
-        
-        log('Required data not in request')    
-        return '412'
+    # check if all requirements are valid
+    rsp = authenticate_request(auth, [email, checksum], check_files=True,
+                               rqs_file=datafile)
+    if rsp != '':  # empty string means no error
+        return rsp  # return error code
 
     # add email to db
-    station_dir = register_email(auth, email)
-
+    station_dir = mongodb.register_email(auth, email)
     log('Email registered')
 
-    # save config file
-    datafile = request.files['sensor_config']
-    checksum = request.headers['checksum']
+    # save file iff the checksum matches
+    if files.verify_save_file(datafile, checksum,
+                              os.path.join(station_dir, 'sensors_config.txt')):
+        return '200'  # succesfully saved file
 
-    # check for empty fields / None
-    if ((datafile.filename == '') or (checksum == '')):
-        log('Empty file or checksum fields')
-        return '412'
+    # if file could not be saved
+    log('Sensor config file could not be verified')
+    return '500'
 
-    # check for allowed file extensions
-    if (not allowed_file(datafile.filename)):
-        log('Unsupported file type')
-        return '415'
 
-    # save data and validate checksum
-    # add to DB
-    datafile.save(f'{station_dir}sensors_config.txt')
-    if not verify_checksum(f'{station_dir}sensors_config.txt', checksum):
-        # remove file
-        os.system(f'rm {station_dir}sensors_config.txt')
-        log('Sensor config file could not be verified')
-        return '500'
-
-    return '200'
-        
-
-# authentication route
-# verifies id sent by pi 
-# if authenticated, returns route to upload files
 @app.route('/upload/', methods=['GET'])
-def authenticate():
+def authenticate() -> str:
+    '''
+    Main channel to receive data. This route constantly listens to all stations
+    and when contacted, authenticats the station and creates a temporary
+    dedicated url for that station to send data through
+    @return "301 <rand_str>" if successfully verified, "<error_code>" otherwise
+    The temporary url created will have the form "/upload/<rand_str>"
+    '''
     # collect headers from request
     auth = request.headers.get('pi_id', None)
 
-    # if request has no authentication or wrong id
-    if ((auth == None) or (not is_auth(auth))):
-        log('Unathorized access, rejected')
-        return '401'
+    rsp = authenticate_request(auth)
+    if rsp != '':
+        return rsp
 
     # generate random url for data transfer
     url = gen_rand_string()
-    # make sure rand url isn't in use
-    global urls
-    while urls.get(url, None) != None:
-        url = gen_rand_string()
-
     log(f'New request from {auth}, opening /upload/{url}')
 
     # store mapping of id to random url
-    urls[url] = auth      
-    
-    return '301 ' + url
+    urls[url] = auth
+
+    return f'301 {url}'
 
 
-# data transfer route
-# verifies again that sender has a verified id and is 
-    # transmitting to the correct channel
 @app.route('/upload/<url>', methods=['POST'])
-def get_file(url):
-    # collect headers for authentication
-    auth = request.headers.get('pi_id', None)
+def get_data(url: str) -> str:
+    '''
+    Dedicated route for data transfer
+    @param url random string created in the /upload/ route
+    This route will verify that it is being contacted by a station and not a
+    third party
+    Then it will verify that url has been assigned to the station contacting
+    and will only then attempt to recive the files
+    Any file downloaded will have its checksum verified
+    Once no files are left to download, this method must pop url from the
+    global variable urls
+    '''
 
-    # verify if authorized 
-    if ((auth == None) or (urls.get(url, None) == None) or (urls[url] != auth)):
-        log('Unauthorized request, rejected')
-        return '401'
+    # collect headers and files for authentication
+    auth = request.headers.get('pi_id', None)
+    checksum = request.headers('checksum', None)
+    station_num = request.headers('pi_num', None)
+    # collect files
+    datafile = request.files.get('sensor_data_file', None)
+
+    # authenticate all information received is okay
+    rsp = authenticate_request(auth, [checksum, station_num], check_files=True,
+                               rqs_file=datafile)
+    if rsp != '':
+        return rsp
 
     # check how many remaining files
-    #   all arguments are in string form
+    # all arguments are in string form
     num_files = request.headers.get('num_files', '1')
-    if(num_files == '1'):
+    if num_files == '1':
         # remove url - pi pair from existing urls
         urls.pop(url)
 
-    # receive files
-    # check if post request has the files
-    if (('sensor_data_file' not in request.files) or 
-            ('checksum' not in request.headers) or ('pi_num' not in request.headers)):
-        log('Required data not in request')
-        return '412'
-
-    # collect files
-    raw_json = request.get_json()
-    datafile = request.files['sensor_data_file']
-    checksum = request.headers['checksum']
-    station_num = request.headers['pi_num']
-    
-    # check for empty fields / None
-    if ((datafile.filename == '') or (checksum == '')):
-        log('Empty file or checksum fields')
-        return '412'
-
-    # check for allowed file extensions
-    if (not allowed_file(datafile.filename)):
-        log('Unsupported file type')
-        return '415'
-    
-    # create local names for files
-    if 'diagnostic' in datafile.filename:
-        storage_folder = f'{DIAGNOSTICS}station{station_num}/'
+    # create storage path for the files to store
+    if 'diagnostics' in datafile.filename:
+        storage_folder = files.make_storage_path(datafile.filename,
+                                                 files.DIAGNOSTICS,
+                                                 f'station{station_num}')
     else:
-        storage_folder = f'{STORAGE_FOLDER}station{station_num}/' + \
-            f'{get_date(datafile.filename)}/'
-        # Check if this folder exists, if not create
-        if not os.path.isdir(storage_folder):
-            os.mkdir(storage_folder)
-        
-    data_f_name = os.path.join(storage_folder, secure_filename(datafile.filename))
-    data_f_name_temp = os.path.join(storage_folder, secure_filename('temp_' + datafile.filename))
+        storage_folder = \
+            files.make_storage_path(datafile.filename,
+                                    files.STORAGE_FOLDER,
+                                    f'station{station_num}',
+                                    files.get_date(datafile.filename))
+    # create full name for file
+    data_f_name = os.path.join(
+        storage_folder, secure_filename(datafile.filename))
 
-    name = datafile.filename.split('.')[0]
-    checksum_f_name = os.path.join(storage_folder, 
-            secure_filename(name + '.sha256'))
-
-    # save data file
-    datafile.save(data_f_name_temp)
-    
-    upload_to_mongodb(raw_json, station_num)
-
-    # verify checksum
-    chksm = verify_checksum(data_f_name_temp, checksum)
-    if chksm: # successful verification
-        log(f'Checksum verified successfully, storing {data_f_name}')
-        
-        # save checksume file
-        with open(checksum_f_name, 'w') as f:
-            f.write(f'{checksum} {secure_filename(datafile.filename)}\n')
-
-        # remove temp file
-        os.system(f'mv {data_f_name_temp} {data_f_name}')
-
-        # return success code
-        return '200'
-
-    else:
-        print('Wrong checksum')
-        # delete store file
-        os.remove(data_f_name_temp)
-
-        # return error
+    # make sure checksum matches the file transfered
+    if not files.verify_save_file(datafile,
+                                  checksum,
+                                  data_f_name,
+                                  store_chkm=True):
         return '500'
-    
+
+    # if checksum matched, upload to mongo
+    mongodb.upload_to_mongodb(request.get_json(),
+                              files.get_date(datafile.filename),
+                              f'station{station_num}')
+
+    return '200'
