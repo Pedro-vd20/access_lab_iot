@@ -145,7 +145,7 @@ def main():
         raise ConnectionFailure
 
     # create config information
-    # create_config(folder, mongodb)
+    create_config(folder, mongodb)
 
     # loop through all files
     for root, _, files_list in os.walk(os.path.join(folder, 'received_files')):

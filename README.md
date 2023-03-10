@@ -1,7 +1,8 @@
 
 # Access Lab Measurement Stations
 
-Version 2.0.0 Now running Mongo! This version is currently unstable and in the process of testing all mongo interactions. Major code rewrites are under testing and thus this version is unstable.
+Version 2.0.1 
+This version has been tested for all the new features and refactored code/modules. It is ready to deploy on the server
 
 ## Receiver
 
@@ -42,7 +43,6 @@ $ pip3 install pymongo
 ./
  |-- cert.pem
  |-- key.pem
- |-- ids.json
  |-- diagnostics.py
  |-- read_station_data.py
  |-- receiver.py
@@ -75,13 +75,11 @@ $ pip3 install pymongo
 ### Related Files
 * `cert.pem`: self-signed certificate for the HTTPS connection.
 * `key.pem`: private key to go along with `cert.pem`.
-* `ids.json`: contains all PI ids, station number, associated sensors with that station, and their registered email for server to check.
 * `diagnostics.py`: (CURRENTLY ONLY PARTIAL IMPLEMENTATION) goes over all data sent by stations and checks for discrepancies.
     * Sensor drift by comparing the difference between redundant sensor measurements (TO BE IMPLEMENTED).
     * Check diagnostics information whenever sensors provide such.
     * Check for missing sensor data (i.e a sensor no longer reporting anything)
     * Report errors found in data (TO BE IMPLEMENTED).
-* `read_station_data.py`: module with methods to fetch all the data from a specific station. After moving to MongoDB, this file will be removed in favor of a more interactive website to fetch data.
 * `receiver.py`: flask server to receive data and diagnostic files, show users data collected, and upload information to the database.
 * `modules/files.py`: methods centered around files and directories that receiver and mongo need.
 * `modules/mongo.py`: Mongo class to handle all communiocation with the MongoDB database, including all data updates and info reading.  
@@ -216,7 +214,7 @@ Below is a sample configuration document. Recalll the `id` is a unique hexadecim
         "air_sensor": 2,
         "gps": 1
     },
-    "id": 0x0000000000000000,
+    "id": "0000000000000000",
     "email": "youremail@sample.com",
     "stationary": true,
     "station_num": 3

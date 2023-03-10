@@ -1,7 +1,6 @@
 import pymongo
-import os
 import datetime
-from modules.files import STORAGE_FOLDER, DIAGNOSTICS
+import modules.files as files
 
 
 '''
@@ -53,7 +52,7 @@ class Mongo:
         self.client = pymongo.MongoClient(connection_ip, connection_port)
         self.db = self.client[db]
 
-    def test_connection(self):
+    def test_connection(self) -> bool:
         '''
         Attempts to contact mongodb server to see if a connection is working
         '''
@@ -73,7 +72,7 @@ class Mongo:
 
         return self.db['stations_info'].find_one({'id': pi_id}) is not None
 
-    def register_email(self, id: str, email: str) -> str:
+    def register_station(self, id: str, email: str, config: dict) -> None:
         '''
         Registers a new email to a station and creates folder for that station
         @param auth hex string that identifies that station
@@ -82,22 +81,23 @@ class Mongo:
         '''
 
         # get correct station number from id
-        station_num = self.db['stations_info'].find_one({'id': id}).get(
-            ['station_num'])
+        station_num = int(self.db['stations_info'].find_one(
+            {'id': id})['station_num'])  
+        # mongo transforms numbers into decimals, needing to be converted back
 
         # add email to station-info
         self.db['station-info'].update_one({'id': id},
-                                           {'$set': {'email': email}})
+                                           {'$set': {'email': email,
+                                                     'sensors': config}})
         # add email to the station's specific collection
         self.db[f'station{station_num}'].update_one({'config': True},
-                                                    {'$set': {'email': email}})
+                                                    {'$set':
+                                                     {'email': email,
+                                                      'sensors': config}})
 
-        # create folders for this new station
-        station_dir = os.path.join(STORAGE_FOLDER, f'station{station_num}')
-        os.mkdir(station_dir)
-        os.mkdir(os.path.join(DIAGNOSTICS, f'station{station_num}'))
-
-        return station_dir
+        # create folders for this new station to save data into
+        files.make_storage_path(files.STORAGE_FOLDER, f'station{station_num}')
+        files.make_storage_path(files.DIAGNOSTICS, f'station{station_num}')
 
     def __collect_gps__(self, gps_data: dict, upload_dict: dict) -> None:
         '''
@@ -302,7 +302,8 @@ class Mongo:
 
     def upload_to_mongodb(self,
                           raw_json: dict,
-                          month: str, station_num: str) -> None:
+                          month: str,
+                          station_num: str) -> None:
         '''
         Reads json file sent by station and reformats it to upload to mongodb
         @param raw_json dictionary sent by station

@@ -2,6 +2,7 @@ import os
 import hashlib
 from werkzeug.datastructures import FileStorage
 from werkzeug.utils import secure_filename
+import json
 
 '''
 Copyright (C) 2022 Francesco Paparella, Pedro Velasquez
@@ -32,8 +33,8 @@ checksum verifying, checking file extensions, and so on
 
 # constants definitions
 
-STORAGE_FOLDER = '/home/pv850/received_files/'
-DIAGNOSTICS = '/home/pv850/diagnostics/'
+STORAGE_FOLDER = './received_files/'
+DIAGNOSTICS = './diagnostics/'
 # only accept txt and sha256 files
 ALLOWED_EXTENSIONS = ('txt', 'json', 'csv')
 
@@ -50,7 +51,7 @@ def allowed_file(filename: str) -> bool:
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
-def verify_checksum(fname: str, chksm: str) -> True:
+def verify_checksum(file_data: FileStorage, chksm: str) -> True:
     '''
     check the checksum of a file matches one in args
     @param fname name of file to calculate checksum
@@ -58,14 +59,11 @@ def verify_checksum(fname: str, chksm: str) -> True:
     @return True if chksm matches the checksum of fname
     '''
 
-    # check file validity
-    if not os.path.isfile(fname):
-        return False
+    # get file stream data
+    file_stream = file_data.stream
+    file_stream.seek(0)
 
-    with open(fname, 'rb') as f:
-        hash_256 = hashlib.sha256(f.read()).hexdigest()
-
-    return hash_256 == chksm
+    return hashlib.sha256(file_stream.read()).hexdigest() == chksm
 
 
 def get_date(fname: str, reverse: bool = False) -> str:
@@ -109,25 +107,25 @@ def verify_save_file(data_file: FileStorage,
         check
     @param data_file File to save
     @param checksum to compare with checksum computed
-    @param storage_name directory + filename to store file
+    @param storage_name directory to store file
     @param store_chkm ask to save the checksum as its own file
+    @return dictionary with the data from saved file
     @return True if file is saved and verified with passed checksum
         False otherwise
     Postcondition: data_file is saved IF AND ONLY IF its computed checksum
         matches the one in parameters
     '''
 
-    # make sure filename is secure
-    storage_name = secure_filename(storage_name)
+    # make sure checksum is verified
+    if not verify_checksum(data_file, checksum):
+        return False
+
+    # make sure filename is secure to save
+    storage_name = os.path.join(storage_name,
+                                secure_filename(data_file.filename))
 
     # save file
     data_file.save(storage_name)
-
-    # verify checksum
-    if not verify_checksum(storage_name, checksum):
-        # checksum not verified, must delete file
-        os.remove(storage_name)
-        return False
 
     # check to save checksum
     if store_chkm:
@@ -146,7 +144,8 @@ def save_checksum(checksum: str, storage_name: str) -> None:
     '''
 
     # create name of checksum
-    checksum_full_f_name = storage_name.split('.')[0] + '.sha256'
+    checksum_full_f_name = '.'.join(storage_name.split('.')[:-1]) + '.sha256'
+
     # get just name of data file
     data_file_name = storage_name.split('/')[-1]
 
@@ -155,23 +154,35 @@ def save_checksum(checksum: str, storage_name: str) -> None:
         out_f.write(f'{checksum} {data_file_name}')
 
 
-def make_storage_path(f_name: str, *args: str) -> str:
+def make_storage_path(*args: str) -> str:
     '''
     Uses all arguments to create a folder path and verifies folder exists. If
     it does not exists, creates it
     Precondition: when *args is more than 1 folder level, AT LEAST all but the
         last level must already exist or the function will crash
         i.e if pasing (data, tree, month_1) then ./data/tree must already exist
-    @param f_name name of file to save, should be made a secure_filename in
-        case
     @param *args strings to connect into path
     '''
 
-    # join full directories
-    full_path = os.path.join(*args)
-
     # check if dir exists
-    if not os.path.isdir(full_path):
+    if not os.path.isdir(full_path := os.path.join(*args)):
         os.mkdir(full_path)
 
-    return os.path.join(full_path, secure_filename(f_name))
+    return full_path
+
+
+def stream_to_json(data: FileStorage) -> dict:
+    '''
+    Takes the bytes from a file storage and returns a json dictionary of the
+    file
+    Precondition: the file passed through follows the json format
+    @param data FileStorage object to read and extract data from
+    @return dictionary containing the data
+    '''
+
+    # read the bytes from the file
+    my_file = data.stream
+    my_file.seek(0)
+
+    # read the json data from the bytestream
+    return json.load(my_file)

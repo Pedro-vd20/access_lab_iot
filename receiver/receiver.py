@@ -1,7 +1,6 @@
 import os
 import datetime
 from flask import Flask, request
-from werkzeug.utils import secure_filename
 from werkzeug.datastructures import FileStorage
 from random import choice
 from string import ascii_letters
@@ -96,10 +95,10 @@ def gen_rand_string(length: int = URL_LEN) -> str:
     while urls.get(rand_str, None) is not None:
         rand_str = ''.join([choice(ascii_letters) for i in range(length)])
 
-    return urls
+    return rand_str
 
 
-def init_data():
+def init_data() -> None:
     '''
     Check if all necessary dependencies are working
     These are: mongo, storage folder, and diagnostics folder
@@ -110,7 +109,7 @@ def init_data():
             os.path.isdir(files.DIAGNOSTICS)):
         log('Error finding folders')
         raise NotADirectoryError(f'Missing {files.STORAGE_FOLDER} or ' +
-                                 'f{files.DIAGNOSTICS}')
+                                 f'{files.DIAGNOSTICS}')
 
     # check mongo
     if not mongodb.test_connection():
@@ -119,7 +118,7 @@ def init_data():
 
 
 def authenticate_request(pi_id: str,
-                         headers: list,
+                         headers: list = [],
                          check_files: bool = False,
                          rqs_file: FileStorage = None) -> str:
     '''
@@ -141,7 +140,7 @@ def authenticate_request(pi_id: str,
 
     # check headers and files for None
     for header in headers:
-        if headers is None:
+        if header is None:
             log('Required data not in request')
             return '412'
 
@@ -152,8 +151,8 @@ def authenticate_request(pi_id: str,
     # Checking file
 
     # check empty file name
-    if rqs_file.filename == '':
-        log('Empty file or checksum fields')
+    if rqs_file is None or rqs_file.filename == '':
+        log('Empty file')
         return '412'
 
     # check for supported file type
@@ -220,21 +219,23 @@ def register() -> str:
     # check if all requirements are valid
     rsp = authenticate_request(auth, [email, checksum], check_files=True,
                                rqs_file=datafile)
+
     if rsp != '':  # empty string means no error
         return rsp  # return error code
 
-    # add email to db
-    station_dir = mongodb.register_email(auth, email)
-    log('Email registered')
+    log('register is auth!')
 
-    # save file iff the checksum matches
-    if files.verify_save_file(datafile, checksum,
-                              os.path.join(station_dir, 'sensors_config.txt')):
-        return '200'  # succesfully saved file
+    # do not register if checksum fails
+    if not files.verify_checksum(datafile, checksum):
+        return '500'
 
-    # if file could not be saved
-    log('Sensor config file could not be verified')
-    return '500'
+    log('checksum approved')
+    log(files.stream_to_json(datafile))
+
+    # upload to mongodb
+    mongodb.register_station(auth, email, files.stream_to_json(datafile))
+
+    return '200'  # succesfully saved file
 
 
 @app.route('/upload/', methods=['GET'])
@@ -279,49 +280,47 @@ def get_data(url: str) -> str:
 
     # collect headers and files for authentication
     auth = request.headers.get('pi_id', None)
-    checksum = request.headers('checksum', None)
-    station_num = request.headers('pi_num', None)
+    checksum = request.headers.get('checksum', None)
+    station_num = request.headers.get('pi_num', None)
     # collect files
     datafile = request.files.get('sensor_data_file', None)
+    # check how many remaining files
+    # all arguments are in string form
+    num_files = request.headers.get('num_files', '1')
 
     # authenticate all information received is okay
     rsp = authenticate_request(auth, [checksum, station_num], check_files=True,
                                rqs_file=datafile)
+
     if rsp != '':
         return rsp
 
-    # check how many remaining files
-    # all arguments are in string form
-    num_files = request.headers.get('num_files', '1')
     if num_files == '1':
         # remove url - pi pair from existing urls
         urls.pop(url)
 
+    # modify station_num for easier use later on the file
+    station_num = f'station{station_num}'
+
     # create storage path for the files to store
     if 'diagnostics' in datafile.filename:
-        storage_folder = files.make_storage_path(datafile.filename,
-                                                 files.DIAGNOSTICS,
-                                                 f'station{station_num}')
+        storage_path = files.make_storage_path(files.DIAGNOSTICS, station_num)
     else:
-        storage_folder = \
-            files.make_storage_path(datafile.filename,
-                                    files.STORAGE_FOLDER,
-                                    f'station{station_num}',
+        storage_path = \
+            files.make_storage_path(files.STORAGE_FOLDER,
+                                    station_num,
                                     files.get_date(datafile.filename))
-    # create full name for file
-    data_f_name = os.path.join(
-        storage_folder, secure_filename(datafile.filename))
 
     # make sure checksum matches the file transfered
     if not files.verify_save_file(datafile,
                                   checksum,
-                                  data_f_name,
+                                  storage_path,
                                   store_chkm=True):
         return '500'
 
     # if checksum matched, upload to mongo
-    mongodb.upload_to_mongodb(request.get_json(),
-                              files.get_date(datafile.filename),
-                              f'station{station_num}')
+    mongodb.upload_to_mongodb(files.stream_to_json(datafile),
+                              files.get_date(datafile.filename, reverse=True),
+                              station_num)
 
     return '200'
