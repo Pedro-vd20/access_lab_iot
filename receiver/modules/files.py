@@ -1,9 +1,3 @@
-import os
-import hashlib
-from werkzeug.datastructures import FileStorage
-from werkzeug.utils import secure_filename
-import json
-
 '''
 Copyright (C) 2022 Francesco Paparella, Pedro Velasquez
 
@@ -23,6 +17,12 @@ You should have received a copy of the GNU General Public License along with
 "ACCESS IOT Stations". If not, see <https://www.gnu.org/licenses/>.
 
 '''
+
+import os
+import hashlib
+from werkzeug.datastructures import FileStorage
+from werkzeug.utils import secure_filename
+import json
 
 '''
 This module contains methods centered around file manipulations including

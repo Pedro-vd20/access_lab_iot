@@ -1,14 +1,3 @@
-import os
-import datetime
-from flask import Flask, request
-from werkzeug.datastructures import FileStorage
-from random import choice
-from string import ascii_letters
-from pymongo.errors import ConnectionFailure
-# for safety and consistency, we should change to Flask-PyMongo
-import modules.files as files
-import modules.mongo as mongo
-
 '''
 
 Copyright (C) 2022 Francesco Paparella, Pedro Velasquez
@@ -29,6 +18,17 @@ You should have received a copy of the GNU General Public License along with
 "ACCESS IOT Stations". If not, see <https://www.gnu.org/licenses/>.
 
 '''
+
+import os
+import datetime
+from flask import Flask, request
+from werkzeug.datastructures import FileStorage
+from random import choice
+from string import ascii_letters
+from pymongo.errors import ConnectionFailure
+# for safety and consistency, we should change to Flask-PyMongo
+import modules.files as files
+import modules.mongo as mongo
 
 '''
 From https://flask.palletsprojects.com/en/2.0.x/patterns/fileuploads/

@@ -1,10 +1,3 @@
-import modules.mongo as mongo
-from pymongo.errors import ConnectionFailure
-import modules.files as files
-import os
-import json
-import sys
-
 '''
 Copyright (C) 2022 Francesco Paparella, Pedro Velasquez
 
@@ -24,6 +17,13 @@ You should have received a copy of the GNU General Public License along with
 "ACCESS IOT Stations". If not, see <https://www.gnu.org/licenses/>.
 
 '''
+
+import modules.mongo as mongo
+from pymongo.errors import ConnectionFailure
+import modules.files as files
+import os
+import json
+import sys
 
 '''
 This file will go through a list of existing data files that have NEVER been

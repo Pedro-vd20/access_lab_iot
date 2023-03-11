@@ -1,8 +1,3 @@
-import pymongo
-import datetime
-import modules.files as files
-
-
 '''
 Copyright (C) 2022 Francesco Paparella, Pedro Velasquez
 
@@ -22,6 +17,10 @@ You should have received a copy of the GNU General Public License along with
 "ACCESS IOT Stations". If not, see <https://www.gnu.org/licenses/>.
 
 '''
+
+import pymongo
+import datetime
+import modules.files as files
 
 '''
 This module will involve any method that has to do with uploading / reading
@@ -82,7 +81,7 @@ class Mongo:
 
         # get correct station number from id
         station_num = int(self.db['stations_info'].find_one(
-            {'id': id})['station_num'])  
+            {'id': id})['station_num'])
         # mongo transforms numbers into decimals, needing to be converted back
 
         # add email to station-info
