@@ -43,6 +43,7 @@ Expected folder structure:
  |- station1/
  ...
  |- stationn/
+./ids.json
 '''
 
 ##########

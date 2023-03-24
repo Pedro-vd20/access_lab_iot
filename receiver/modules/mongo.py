@@ -151,6 +151,9 @@ class Mongo:
         '''
 
         for i, info in enumerate(sensor_data):
+            if info is None:
+                continue
+
             # iterate through the dictionary and create the mongo nesting
             # scheme
             upload_dict.update(
