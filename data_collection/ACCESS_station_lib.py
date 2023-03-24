@@ -286,7 +286,8 @@ class NEXTPMbeseecher(Beseecher):
     pm.measurePM_10_seconds() - measures PM1, PM2.5, PM10 averaging over 10 s
     pm.measurePM_1_minute()   - measures PM1, PM2.5, PM10 averaging over 1 m
     pm.measurePM_15_minutes() - measures PM1, PM2.5, PM10 averaging over 15 m
-    pm.measure() - starts up measurements (using measure_PM_1_minute) but additionally controls ON / OFF depending on humidity 
+    pm.measure() - starts up measurements (using measure_PM_1_minute) but
+        additionally controls ON / OFF depending on humidity
     pm.get_firmware_version() - returns a hex number in a 4-character string
 
     Note that the measurement methods are blocking, for a time
@@ -302,7 +303,8 @@ class NEXTPMbeseecher(Beseecher):
     because the hardware doesn't keep track of how long it has been on,
     thus the object's software timer is set upon initialization.
 
-    If the sensor is powered off, calling a measurePM method powers the sensor on.
+    If the sensor is powered off, calling a measurePM method powers the sensor
+    on.
 
     The sensor is rated for ~10000h (~1year) of fan and laser
     operation. Keeping it off if not necessary should increase its usable
@@ -326,25 +328,26 @@ class NEXTPMbeseecher(Beseecher):
         'Get_status':           b'\x81\x16\x69',
         'Get_firmware_version': b'\x81\x17\x68',
     }
-    SLEEP_BIT     = 1
-    DEGRADED_BIT  = 2
-    NOTREADY_BIT  = 4
-    RH_ERROR_BIT   = 8
+
+    SLEEP_BIT = 1
+    DEGRADED_BIT = 2
+    NOTREADY_BIT = 4
+    RH_ERROR_BIT = 8
     TRH_ERROR_BIT = 16
     FAN_ERROR_BIT = 32
     MEM_ERROR_BIT = 64
     LAS_ERROR_BIT = 128
-    #INVALID_ANSW is b'\x16' which shouln'd be returned by any of 
-    #the first 4 commands when the sensor is switched on.
-    INVALID_ANSW  = 22 
-    
+    # INVALID_ANSW is b'\x16' which shouln'd be returned by any of
+    # the first 4 commands when the sensor is switched on.
+    INVALID_ANSW = 22
+
     def __init__(self,
-                 port = '/dev/ttyAMA0',
-                 baudrate = 115200,
-                 parity = serial.PARITY_EVEN,
-                 stopbits = serial.STOPBITS_ONE,
-                 bytesize = serial.EIGHTBITS,
-                 timeout = 1.0,
+                 port='/dev/ttyAMA0',
+                 baudrate=115200,
+                 parity=serial.PARITY_EVEN,
+                 stopbits=serial.STOPBITS_ONE,
+                 bytesize=serial.EIGHTBITS,
+                 timeout=1.0,
                  index=0
                  ):
         # initialize parent class
@@ -362,9 +365,9 @@ class NEXTPMbeseecher(Beseecher):
 
         self._test_uart()
 
-        #Make sure that the on/off status of the object reflects that
-        #of the hardware. The following doesn't change the
-        #sensor's actual on/off status
+        # Make sure that the on/off status of the object reflects that
+        # of the hardware. The following doesn't change the
+        # sensor's actual on/off status
         if self._get_status()[2] & self.SLEEP_BIT == 1:
             self.powerOFF()
         else:
@@ -373,8 +376,8 @@ class NEXTPMbeseecher(Beseecher):
     def _checksum(self, bstring):
         if not isinstance(bstring, bytes):
             raise TypeError("'bstring' must be of type 'bytes'")
-        return (256 - sum([x for x in bstring]) % 256 ) % 256
-    
+        return (256 - sum([x for x in bstring]) % 256) % 256
+
     def _send_cmd_get_rply(self, cmd):
         sleep_time = 0.5
         N_attempts = 3
@@ -392,11 +395,11 @@ class NEXTPMbeseecher(Beseecher):
                 break
             time.sleep(sleep_time*(i+1))
         else:
-            raise ValueError(f"""
-                NextPM on port {self.port} replied an empty string or failed the checksum. 
-                Last reply after {N_attempts} was:
-                {rply}
-            """)
+            raise ValueError(
+                f'NextPM on port {self.port} replied an empty string or ' +
+                'failed the checksum.\n' +
+                'Last reply after {N_attempts} was:\n' +
+                f'{rply}')
         return rply
 
     # attempt to read connection of serial ports
@@ -406,46 +409,56 @@ class NEXTPMbeseecher(Beseecher):
                 _ = ser.read_all()
                 return True
         except Exception as err:
-            print('Please check your serial connections. The port given could not be accessed.')
-            print('It could be that your ttyS0 and ttyAMA0 configuration is flipped')
-            raise(err)
+            print('Please check your serial connections. The port given ' +
+                  'could not be accessed.')
+            print('It could be that your ttyS0 and ttyAMA0 configuration ' +
+                  'is flipped')
+            raise err
 
     def _get_status(self):
         return self._send_cmd_get_rply(self.NextPMcmd['Get_status'])
-    
+
     def powerON(self):
-        """Switches on the sensor's fan and laser. If the sensor is already on only resets 'self.time_of_powerON' """
+        """
+        Switches on the sensor's fan and laser. If the sensor is already on
+        only resets 'self.time_of_powerON'
+        """
         if self._get_status()[2] & self.SLEEP_BIT == 1:
             self._send_cmd_get_rply(self.NextPMcmd['Toggle_PWR'])
         self.time_of_powerON = time.time()
-        
+
     def powerOFF(self):
-        """Switches off the sensor's fan and laser. If the sensor is already on only resets 'self.time_of_powerON' """
+        """
+        Switches off the sensor's fan and laser. If the sensor is already
+        on only resets 'self.time_of_powerON'
+        """
         if self._get_status()[2] & self.SLEEP_BIT == 0:
             self._send_cmd_get_rply(self.NextPMcmd['Toggle_PWR'])
         self.time_of_powerON = None
 
     def is_ON(self):
-        """Returns False if the sensor is off, True otherwise. This
+        """
+        Returns False if the sensor is off, True otherwise. This
         interrogates the sensor's hardware, and resets the state of the
-        NEXTPMbeseecher instance's internal timer if necessary"""
+        NEXTPMbeseecher instance's internal timer if necessary
+        """
         if self._get_status()[2] & self.SLEEP_BIT == 1:
-            #The following 'if' is unnecessary if there's only 1 object
-            #of this class. With multiple object (maybe in different
-            #processes) the status recorded in self.time_of_powerON
-            #may not reflect the status of the hardware (given by
-            #self._get_status())
+            # The following 'if' is unnecessary if there's only 1 object
+            # of this class. With multiple object (maybe in different
+            # processes) the status recorded in self.time_of_powerON
+            # may not reflect the status of the hardware (given by
+            # self._get_status())
             if self.time_of_powerON is not None:
                 self.time_of_powerON = None
             return False
         else:
             if self.time_of_powerON is None:
                 self.time_of_powerON = time.time()
-            return True             
-        #-----------
-        #if self.time_of_powerON is None:
+            return True
+        # -----------
+        # if self.time_of_powerON is None:
         #    return False
-        #else:
+        # else:
         #    return True
 
     def _measurePM(self, cmd, acquisition_time):
@@ -454,21 +467,21 @@ class NEXTPMbeseecher(Beseecher):
         time_elapsed_ON = time.time() - self.time_of_powerON
         if time_elapsed_ON < acquisition_time:
             time.sleep(acquisition_time - time_elapsed_ON)
-        #Acquires sensor's Temperature and RH
+        # Acquires sensor's Temperature and RH
         res = self._send_cmd_get_rply(self.NextPMcmd['Get_T_RH'])
         if (res[1] == self.INVALID_ANSW) or (res[2] & self.SLEEP_BIT == 1):
             raise ValueError(f"""
                     Invalid answer while requesting T and RH:
                     {res}
             """)
-        T  = 0.9754*int.from_bytes(res[3:5], 'big')/100 - 4.2488
+        T = 0.9754*int.from_bytes(res[3:5], 'big')/100 - 4.2488
         RH = 1.1768*int.from_bytes(res[5:7], 'big')/100 - 4.7270
-        #Acquires dust concentrations
+        # Acquires dust concentrations
         res = self._send_cmd_get_rply(cmd)
         if (res[1] == self.INVALID_ANSW) or (res[2] & self.SLEEP_BIT == 1):
             raise ValueError(f"""
                     Invalid answer while requesting PM:
-                    {res} 
+                    {res}
             """)
         return {
             "type": self.TYPE,
@@ -491,18 +504,18 @@ class NEXTPMbeseecher(Beseecher):
                 'Las_error':  res[2] & self.LAS_ERROR_BIT != 0,
             }
         }
-        
+
     def measurePM_10_seconds(self, acquisition_time=30):
         return self._measurePM(self.NextPMcmd['Get_PM_10sec'],
                                acquisition_time)
-    
+
     def measurePM_1_minute(self, acquisition_time=120):
         return self._measurePM(self.NextPMcmd['Get_PM_60sec'],
                                acquisition_time)
 
-    #default measurement method is 1 minute.
+    # default measurement method is 1 minute.
     def measure(self):
-        # turn on in case was off        
+        # turn on in case was off
         self.powerON()
 
         data = self.measurePM_1_minute()
@@ -513,7 +526,6 @@ class NEXTPMbeseecher(Beseecher):
 
         return data
 
-        
     def measurePM_15_minutes(self, acquisition_time=1000):
         return self._measurePM(self.NextPMcmd['Get_PM_900sec'],
                                acquisition_time)
@@ -646,7 +658,7 @@ class BME280beseecher(Beseecher):
             print('Overscan setting not allowed. Only the following allowed:',
                   self.OVERSCANS, sep='\n')
             return False
-        
+
         # set overscan
         self.sensor.overscan_humidity = overscan
         self.sensor.overscan_temperature = overscan
@@ -663,7 +675,8 @@ class BME280beseecher(Beseecher):
 
         # check for valid value
         if overscan not in self.OVERSCANS:
-            print('Overscan setting not allowed. Only the following allowed:', self.OVERSCANS, sep='\n')
+            print('Overscan setting not allowed. Only the following allowed:',
+                  self.OVERSCANS, sep='\n')
             return False
         self.sensor.overscan_humidity = overscan
         # self.sensor.overscan_temperature = overscan
@@ -841,11 +854,11 @@ class SPS30beseecher(Beseecher):
         # The following raises a 'FileNotFoundError' exception if
         # the specified i2c bus does not exists.
         self.sps = SPS30(bus=i2c_bus_number)
-        self.i2c_bus_number = i2c_bus_number 
+        self.i2c_bus_number = i2c_bus_number
         self.sps.write_auto_cleaning_interval_days(cleaning_interval_in_days)
         self.sps.start_measurement()  # we keep the sps30 always on:
         # max power draw 80mA
-                                
+
     def measure(self):
         sensor_data = self.sps.get_measurement()['sensor_data']
         results = {'type': self.TYPE, 'sensor': f'{self.SENSOR}{self.index}'}
