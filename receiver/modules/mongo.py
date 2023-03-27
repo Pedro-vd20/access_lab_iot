@@ -151,11 +151,10 @@ class Mongo:
         '''
 
         for i, info in enumerate(sensor_data):
-            if info is None:
-                continue
-
             # iterate through the dictionary and create the mongo nesting
             # scheme
+            if info is None:
+                continue
             upload_dict.update(
                 {f'{sensor_name}.{key}.{i}': value
                  for key, value in info.items()}
@@ -223,6 +222,8 @@ class Mongo:
         #   (i.e sps30 collects PM4count / PM4mass but nextpm does not)
         measurements = set()
         for s in sensor_list:
+            if s is None:
+                continue
             measurements.update(s.keys())
 
         # template for each measurement
@@ -235,7 +236,7 @@ class Mongo:
             # because it is constant, it can be filled out at template phase
             elif measurement == 'type':
                 template[sensor_name][measurement] = {
-                    str(i): sensor_list[i][measurement]
+                    str(i): '' if sensor_list[i] is None else sensor_list[i][measurement]
                     for i in range(num_sens)
                 }
                 continue

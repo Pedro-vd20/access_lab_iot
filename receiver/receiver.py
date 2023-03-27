@@ -305,8 +305,17 @@ def get_data(url: str) -> str:
     # create storage path for the files to store
     if 'diagnostics' in datafile.filename:
         storage_path = files.make_storage_path(files.DIAGNOSTICS, station_num)
-    else:
-        storage_path = \
+
+        # store and do not upload to mongo
+        if files.verify_save_file(datafile,
+                                  checksum,
+                                  storage_path,
+                                  store_chkm=True):
+            return '200'
+        else:
+            return '500'
+
+    storage_path = \
             files.make_storage_path(files.STORAGE_FOLDER,
                                     station_num,
                                     files.get_date(datafile.filename))
