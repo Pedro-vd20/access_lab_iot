@@ -19,7 +19,7 @@ Python dependencies
 * Flask 2.1.2
 * werkzeug 2.1.2
 * numpy 1.22.4
-* pandas 0.25.3
+* pandas 1.5.3
 * ssl
 * pymongo 4.3.3
 
@@ -445,7 +445,7 @@ This guide will follow the steps from boot up to operation required to set up th
 
     Then reboot the RPi to connect and implement the settings from step (2).
 
-1. Download the necessary files and setup the folder structure as described [here](#folder-structure). BGe sure to give the RPi its unique ID, and update the server to accept this ID.
+1. Download the necessary files and setup the folder structure as described [here](#folder-structure). Be sure to give the RPi its unique ID, and update the server to accept this ID. The server setup is the last step in this list.
     
     To download the certificate file from the server, scp the file.
     
@@ -506,6 +506,17 @@ This guide will follow the steps from boot up to operation required to set up th
     $ sudo systemctl enable setup
     $ sudo systemctl start setup
     ```
+
+1. Create a config document in the MongoDB database. This document should be stored in the `stations_info` collection. A sample can be seen below:
+    ```json
+    {
+        "config": true,
+        "id": "056F0BC2E9812C0A",
+        "stationary": true,
+        "station_num": 3
+    }
+    ```
+    Stationary indicates whether this station will always collect data from the same location or will be moving.
 
 ### Hardware
 
