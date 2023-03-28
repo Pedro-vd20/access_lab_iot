@@ -445,7 +445,7 @@ This guide will follow the steps from boot up to operation required to set up th
 
     Then reboot the RPi to connect and implement the settings from step (2).
 
-1. Download the necessary files and setup the folder structure as described [here](#folder-structure). Be sure to give the RPi its unique ID, and update the server to accept this ID. The server setup is the last step in this list.
+1. Download the necessary files and setup the folder structure as described [here](#folder-structure). Be sure to give the RPi its unique ID, and update the server to accept this ID. The server setup is the last step in this list. Copy the files from the GitHub and modify the samples to reflect the RPi's unique ID.
     
     To download the certificate file from the server, scp the file.
     
