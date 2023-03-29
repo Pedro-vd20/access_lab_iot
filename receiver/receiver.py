@@ -55,7 +55,7 @@ where:
 # how long urls will be
 URL_LEN = 20
 # mongo connection info
-MONGO_ADDR = 'localhost'
+MONGO_ADDR = '10.224.83.51'
 MONGO_PORT = 27017
 DATABASE = 'stations'
 
