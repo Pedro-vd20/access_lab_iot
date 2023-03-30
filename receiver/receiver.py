@@ -329,7 +329,7 @@ def get_data(url: str) -> str:
 
     # if checksum matched, upload to mongo
     mongodb.upload_to_mongodb(files.stream_to_json(datafile),
-                              files.get_date(datafile.filename, reverse=True),
+                              files.get_date(datafile.filename),
                               station_num)
 
     return '200'

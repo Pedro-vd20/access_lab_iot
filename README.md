@@ -225,7 +225,7 @@ Below is a sample data document based on the one found at the end of the documen
 
 ```json
 {
-    "month": "07_2022",
+    "month": "2022_07",
     "particulate_matter": {
         "PM1count": {
             "0": [174],
