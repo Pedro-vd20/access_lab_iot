@@ -1,8 +1,8 @@
 
 # Access Lab Measurement Stations
 
-Version 2.0.1 
-This version has been tested for all the new features and refactored code/modules. It is ready to deploy on the server
+Version 2.1.0
+This version introduces a user interface to graph data collected by a station.
 
 ## Receiver
 
@@ -26,8 +26,6 @@ Python dependencies
 #### Installation
 
 ```console
-$ sudo apt-get update
-$ sudo apt-get upgrade
 $ sudo apt-get install python3
 $ sudo apt-get install python3-pip
 $
@@ -149,8 +147,8 @@ This will run the app in development mode. This is not recommended as it is less
 
 All sites unrelated to the station-server data sending are currently unimplemented.
 
-* `/`:  Presents users with a search bar to view their station's data. Currently unimplemented.
-* `/view/station<i>`: dynamic url to view each station. `<i>` is to be replaced by the station's number. Currently unimplemented.
+* `/`:  will be replaced by voila separate server
+* `/view/station<i>`: will be replaced by voila separate server
 * `/register/`: new stations will send their information here to:
     
         a) allow the station to test if it's connected to the internet.
@@ -297,7 +295,45 @@ Below is a sample data document based on the one found at the end of the documen
 }
 ```
 
+## Voila
 
+To view the stations, voila will be used to run jupyter notebooks that plot the various data collected by the stations. Voila can create websites from notebooks, which we will use to provide a UI for users to view the data collected by the stations. `voila/iot_data_display.ipynb` provides a short form where users can dynamically select a station, month, and measurement to plot.
+
+### Dependencies
+
+Voila is running
+* Python 3.8.10
+* pip3 20.0.2
+* Ubuntu 22.04.2 LTS (jammy)
+
+Python dependencies
+* Jupyter Notebook 6.5.3
+* voila 0.4.0
+* pymongo 4.3.3
+* ipywidgets 8.0.6
+* IPython 8.11.0
+* matplotlib 3.7.1
+
+### Installation
+
+```console
+$ sudo apt-get install python3
+$ sudo apt-get install python3-pip
+$
+$ pip3 install matplotlib
+$ pip3 install pymongo
+$ pip3 install jupyterlab
+$ pip3 install notebook
+$ pip3 install voila
+$ pip3 install ipywidgets
+$ pip3 install ipython
+```
+
+### Running Voila
+
+```console
+$ voila /path/to/notebook/iot_data_display.ipynb
+```
 
 
 ## Access Stations
