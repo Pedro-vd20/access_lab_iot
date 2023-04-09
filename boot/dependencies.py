@@ -53,7 +53,8 @@ def main() -> int:
     # install all python dependencies
     pip_installs = ['Flask', 'pyserial', 'pigpio', 'pynmea', 'pynmea2',
                     'adafruit-circuitpython-bme280',
-                    'adafruit-circuitpython-ms8607']
+                    'adafruit-circuitpython-ms8607',
+                    'adafruit-circuitpython-scd30']
 
     for package in pip_installs:
         p_install(package)
