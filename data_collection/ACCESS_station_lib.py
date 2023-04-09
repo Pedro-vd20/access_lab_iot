@@ -574,7 +574,7 @@ class BME280beseecher(Beseecher):
         super().__init__('air_sensor', 'bme280', index)
 
         if i2c is None:
-            i2c = board.I2C()
+            i2c = busio.I2C()
 
         self.i2c = i2c
         self.sensor = adafruit_bme280.Adafruit_BME280_I2C(i2c)
