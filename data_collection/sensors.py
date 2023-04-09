@@ -20,7 +20,7 @@ You should have received a copy of the GNU General Public License along with
 ##########
 
 import ACCESS_station_lib as access
-import board
+import busio
 
 ##########
 
@@ -59,7 +59,7 @@ for i in range(2):
                                              str(e)))
 
 # the air sensors need an I2C object
-i2c = board.I2C()
+i2c = busio.I2C()
 
 # initialize air sensors
 # bme
