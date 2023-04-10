@@ -678,6 +678,58 @@ class MS8607beseecher(Beseecher):
             'pressure': prssr
         }
 
+
+class SCD30beseecher(Beseecher):
+    '''
+    wrapper class for the CO2 sensor scd30 
+    requires the package adafruit-circuitpython-scd30
+    '''
+
+    def __init__(self,
+                 i2c: busio.I2C = None,
+                 index: int = 0
+                 ) -> None:
+        '''
+        Initializes sensor using the i2c bus of the raspberry pi
+        @param i2c -> busio.I2C() for the raspberry pi
+        @param index index in array of air_sensors this sensor should take
+        '''
+
+        super().__init__('co2_sensor', 'scd30', index)
+
+        # init new i2c if needed
+        if i2c is None:
+            i2c = busio.I2C(board.SCL, board.SDA)
+
+        self.i2c = i2c
+        self.address = 0x61
+        self.sensor = adafruit_scd30.SCD30(i2c, address=self.address)
+
+    def measure(self) -> dict:
+        '''
+        Collect all the measurements from the sensor
+        @return dictionary of all measurements collected
+        '''
+        MEASUREMENT_INTERVAL = 5
+        MEASUREMENT_DURATION = 30
+
+        co2_readings = [] 
+        start_time = time.monotonic()
+        
+        while time.monotonic() - start_time < MEASUREMENT_DURATION:
+            if self.sensor.data_available:
+                co2 = self.sensor.CO2
+                co2_readings.append(co2)
+            time.sleep(MEASUREMENT_INTERVAL)
+		
+        average_co2 = sum(co2_readings)/len(co2_readings) 
+        
+        return {
+            'type': self.TYPE,
+            'sensor': f'{self.SENSOR}{self.index}',
+            'co2': average_co2 
+        }
+
 # Provides an error class that can be initiated when the script fails to 
 # initialize any sensor
 # Only goal is to keep a sensor object so diagnostics can encounter error and send information
