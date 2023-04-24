@@ -106,7 +106,7 @@ def home() -> str:
 
     # scan for available networks
     os.system('sudo iwlist wlan0 scan | grep ESSID > ' +
-              f'{os.join(modules.PATH, "networks.txt")}')
+              f'{os.path.join(modules.PATH, "networks.txt")}')
 
     # collect networks scanned
     with open(os.path.join(modules.PATH, 'networks.txt'), 'r') as f:
