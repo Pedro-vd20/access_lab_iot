@@ -496,7 +496,6 @@ This guide will follow the steps from boot up to operation required to set up th
     
     ```console
     $ scp user@server_ip:path_to_cert/cert.pem /home/pi/
-    $ export REQUESTS_CA_BUNDLE=/home/pi/cert.pem
     ```
     
     Delete the following files (these act as templates and will be created automatically by the pi with their real values):
@@ -550,6 +549,11 @@ This guide will follow the steps from boot up to operation required to set up th
     `sensors.py` will then loop through the sensors created and assign an index to each. This is necessary for data_collection later and is done automatically.
 
 1. Run `test.py` to do a quick test of all the hardware. If the software doesn't crash, the test was succesful.
+
+1. Set up requests to use the local self-signed certificate of the server.
+   ```console
+   $ export REQUESTS_CA_BUNDLE=/home/pi/cert.pem
+   ```
 
 1. Start the setup mode.
     ```console
