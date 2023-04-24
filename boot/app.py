@@ -124,17 +124,18 @@ def home() -> str:
     # collect possible error info
     # errors from phase 3 stored in network_diag.txt file, if any errors
     #   available
-    with open(os.path.join(modules.PATH, 'network_diag.txt'), 'r') as f:
-        error_info = f.readline()
-        error = error_info != ''
-        '''
-        Possible errors are the following:
-        1. Can't connect to network (no ip)
-        2. Can't connect to wifi (can't send message out)
+    if (os.path.isfile(modules.PATH, 'network_diag.txt')):
+        with open(os.path.join(modules.PATH, 'network_diag.txt'), 'r') as f:
+            error_info = f.readline()
+            error = error_info != ''
+            '''
+            Possible errors are the following:
+            1. Can't connect to network (no ip)
+            2. Can't connect to wifi (can't send message out)
 
-        Info for no ip -> /etc/wpa_supplicant/wpa_supplicant.conf
-        Info for no wifi -> $ ip a | grep wlan0
-        '''
+            Info for no ip -> /etc/wpa_supplicant/wpa_supplicant.conf
+            Info for no wifi -> $ ip a | grep wlan0
+            '''
 
     return render_template('index.html',
                            wifi_list=options,
