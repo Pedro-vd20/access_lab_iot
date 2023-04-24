@@ -371,7 +371,6 @@ Other dependencies
  |   |-- app.py
  |   |-- dependencies.py
  |   |-- setup.py
- |   |-- state.txt
  |   |-- services/
  |   |   |-- flask_app.service
  |   |   |-- setup.service 
@@ -392,7 +391,6 @@ Other dependencies
  |-- sender.py
  |-- sensors.py 
  |-- station_id.py
- |-- station.config
  |-- test.py
  |-- logs/
  |   |--
@@ -412,7 +410,7 @@ All files inside the boot folder will setup the Access Station.
 * `boot/app.py`: small flask server whos only purpose is to collect the wifi information from the user in order to connect.
 * `boot/dependencies.py`: Installs all necessary dependencies and moves necessary services to `/lib/systemd/system/`.
 * `boot/setup.py`: main driver for setting up the access stations. Checks the current state of the machine and continues with next steps by running other files / executing commands.
-* `boot/state.txt`: stores the current state of the station. If the file is non-existant, the state is assumed as 0. States can range from 0 to 5.
+* `boot/state.txt`: stores the current state of the station. If the file is non-existant, the state is assumed as 0. States can range from 0 to 5. This is created automatically.
 * `boot/services/*`: system services to automatically run the setup and the flask app each time the station boots.
 * `boot/static/*`: resources for the flask app such as images, stylesheets, and javascript code.
 * `boot/templates/*`: html pages for the flask app to render.
@@ -445,6 +443,17 @@ All files inside the boot folder will setup the Access Station.
 ### Setting Up
 
 This guide will follow the steps from boot up to operation required to set up the Access Station.
+
+1. Create a config document in the MongoDB database. This document should be stored in the `stations_info` collection. A sample can be seen below:
+    ```json
+    {
+        "config": true,
+        "id": "056F0BC2E9812C0A",
+        "stationary": true,
+        "station_num": 3
+    }
+    ```
+    Stationary indicates whether this station will always collect data from the same location or will be moving.
 
 1. Booting the RPi: configure the keyboard and and username. The user for all stations should be `pi`. 
 
@@ -481,7 +490,7 @@ This guide will follow the steps from boot up to operation required to set up th
 
     Then reboot the RPi to connect and implement the settings from step (2).
 
-1. Download the necessary files and setup the folder structure as described [here](#folder-structure). Be sure to give the RPi its unique ID, and update the server to accept this ID. The server setup is the last step in this list. Copy the files from the GitHub and modify the samples to reflect the RPi's unique ID.
+1. Download the necessary files and setup the folder structure as described [here](#folder-structure). Be sure to give the RPi its unique ID, and update the server to accept this ID. Copy the files from the GitHub and modify the samples to reflect the RPi's unique ID.
     
     To download the certificate file from the server, scp the file.
     
@@ -489,6 +498,11 @@ This guide will follow the steps from boot up to operation required to set up th
     $ scp user@server_ip:path_to_cert/cert.pem /home/pi/
     $ export REQUESTS_CA_BUNDLE=/home/pi/cert.pem
     ```
+    
+    Delete the following files (these act as templates and will be created automatically by the pi with their real values):
+    * `station.config`
+    
+    
 
 1. Make sure Python3 and pip3 are properly installed.
 
@@ -542,17 +556,6 @@ This guide will follow the steps from boot up to operation required to set up th
     $ sudo systemctl enable setup
     $ sudo systemctl start setup
     ```
-
-1. Create a config document in the MongoDB database. This document should be stored in the `stations_info` collection. A sample can be seen below:
-    ```json
-    {
-        "config": true,
-        "id": "056F0BC2E9812C0A",
-        "stationary": true,
-        "station_num": 3
-    }
-    ```
-    Stationary indicates whether this station will always collect data from the same location or will be moving.
 
 ### Hardware
 
