@@ -77,10 +77,9 @@ def main() -> int:
     os.system(f'sudo cp {os.path.join(modules.PATH, "services/*")} ' +
               '/lib/systemd/system/')
     # enable services
-    os.system('sudo systemctl enable setup')
-    os.system('sudo systemctl enable pigpiod')
+    os.system('sudo systemctl daemon-reload')
 
-    modules.log('All services enabled')
+    modules.log('All services loaded')
 
     # create state.txt file
     with open(os.path.join(modules.PATH, 'state.txt'), 'w') as f:
