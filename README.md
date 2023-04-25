@@ -363,7 +363,7 @@ Other dependencies
 * dnsmasq 2.85-1
 * pigpiod 1.79-1+rpt1
 
-### Folder Structure
+### Station Files
 
 ```console
 /home/pi/
@@ -402,8 +402,6 @@ Other dependencies
  |   |--
  |--
 ```
-
-### Related Files
 
 All files inside the boot folder will setup the Access Station.
 
@@ -490,7 +488,7 @@ This guide will follow the steps from boot up to operation required to set up th
 
     Then reboot the RPi to connect and implement the settings from step (2).
 
-1. Download the necessary files and setup the folder structure as described [here](#folder-structure). Be sure to give the RPi its unique ID, and update the server to accept this ID. Copy the files from the GitHub and modify the samples to reflect the RPi's unique ID.
+1. Download the necessary files and setup the folder structure as described [here](#station-files). Be sure to give the RPi its unique ID, and update the server to accept this ID. Copy the files from the GitHub and modify the samples to reflect the RPi's unique ID.
     
     To download the certificate file from the server, scp the file.
     
@@ -500,6 +498,8 @@ This guide will follow the steps from boot up to operation required to set up th
     
     Delete the following files (these act as templates and will be created automatically by the pi with their real values):
     * `station.config`
+
+    Be sure to create the `/home/pi/logs`. The next stages require this folder be created.
     
     
 

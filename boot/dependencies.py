@@ -71,6 +71,7 @@ def main() -> int:
               'netfilter-persistent iptables-persistent')
 
     # set up services
+    os.system('sudo systemctl enable pigpiod')
     os.system('sudo systemctl start pigpiod')
 
     # move services
