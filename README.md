@@ -44,6 +44,7 @@ $ pip3 install pymongo
  |-- diagnostics.py
  |-- read_station_data.py
  |-- receiver.py
+ |-- secret.py
  |-- modules/
  |   |-- files.py
  |   |-- mongo.py
@@ -79,6 +80,7 @@ $ pip3 install pymongo
     * Check for missing sensor data (i.e a sensor no longer reporting anything)
     * Report errors found in data (TO BE IMPLEMENTED).
 * `receiver.py`: flask server to receive data and diagnostic files, show users data collected, and upload information to the database.
+* `secret.py`: file containing the username and password for the read-write account of the mongodb. `receiver.py` will import the contents and use them to upload the data to mongodb.
 * `modules/files.py`: methods centered around files and directories that receiver and mongo need.
 * `modules/mongo.py`: Mongo class to handle all communiocation with the MongoDB database, including all data updates and info reading.  
 * `received_files/`: directory where flask server will save both sha256 checksums and data collected. Files from station `i` will be stored in the subdirectory `received_files/stationi`
@@ -191,7 +193,7 @@ This section will cover all the different collections and data layouts for our m
 
 ### Database
 
-All information stored by this project will be housed in a database called `stations`.
+All information stored by this project will be housed in a database called `stations`. This database should require authentication and have two profiles: one with read/write access and another read-only. The read-only login credentials can be public to allow third parties to view the data freely.
 
 ### Collections
 

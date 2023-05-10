@@ -29,6 +29,7 @@ from pymongo.errors import ConnectionFailure
 # for safety and consistency, we should change to Flask-PyMongo
 import modules.files as files
 import modules.mongo as mongo
+import secret
 
 '''
 From https://flask.palletsprojects.com/en/2.0.x/patterns/fileuploads/
@@ -172,7 +173,11 @@ urls = {}
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 1024 * 128  # max file size (in KB)
 
-mongodb = mongo.Mongo(MONGO_ADDR, MONGO_PORT, DATABASE)
+mongodb = mongo.Mongo(MONGO_ADDR,
+                      MONGO_PORT,
+                      DATABASE,
+                      username=secret.username,
+                      password=secret.password)
 
 # check if all necessary folders / connections work
 init_data()
@@ -316,9 +321,9 @@ def get_data(url: str) -> str:
             return '500'
 
     storage_path = \
-            files.make_storage_path(files.STORAGE_FOLDER,
-                                    station_num,
-                                    files.get_date(datafile.filename))
+        files.make_storage_path(files.STORAGE_FOLDER,
+                                station_num,
+                                files.get_date(datafile.filename))
 
     # make sure checksum matches the file transfered
     if not files.verify_save_file(datafile,

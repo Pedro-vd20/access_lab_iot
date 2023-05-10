@@ -41,14 +41,19 @@ class Mongo:
     def __init__(self,
                  connection_ip: str,
                  connection_port: str,
-                 db: str) -> None:
+                 db: str,
+                 username: str,
+                 password: str) -> None:
         '''
         connect to Mongo
         @param connection_ip ip address of mongo server
         @param connection_port port number of mongo server
         @param db specific database in that mongo server
         '''
-        self.client = pymongo.MongoClient(connection_ip, connection_port)
+        self.client = pymongo.MongoClient(connection_ip,
+                                          connection_port,
+                                          username=username,
+                                          password=password)
         self.db = self.client[db]
 
     def test_connection(self) -> bool:
