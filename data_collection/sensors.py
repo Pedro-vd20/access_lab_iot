@@ -74,7 +74,12 @@ try:
 except Exception as e:
     error_msg = str(e)
     sensors.append(access.ErrorBeseecher('air_sensor', 'ms8607', error_msg))
-
+# scd30
+try:
+    sensors.append(access.SCD30beseecher(i2c=i2c))
+except Exception as e:
+    error_msg = str(e)
+    sensors.append(access.ErrorBeseecher('co2_sensor', 'scd30', error_msg))
 
 '''
 set up indeces for all sensors
