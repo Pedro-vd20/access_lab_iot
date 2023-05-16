@@ -1,8 +1,7 @@
 
 # Access Lab Measurement Stations
 
-Version 2.1.0
-This version introduces a user interface to graph data collected by a station.
+Development of this project has moved to [Here](https://github.com/ACCESS-NYUAD/access_ebox)
 
 ## Receiver
 
