@@ -30,6 +30,8 @@ from adafruit_bme280 import advanced as adafruit_bme280
 # pip3 install adafruit-circuitpython-bme280
 import adafruit_ms8607
 # pip3 install adafruit-circuitpython-ms8607
+import adafruit_scd30
+# pip3 install adafruit-circuitpython-scd30 
 import board
 import busio
 import sys
